@@ -1,0 +1,9 @@
+[package]
+name = "plot"
+cancho = "695e8f9ef8f1fda9d9489a72858a55cdfe86bc86"   # the compiler at the time of writing (cancho main, 2026-11-09); move it when a feature needs a later one
+
+[[bin]]
+name = "plot"
+sources = ["lib/plot", "tools/plot"]
+std = true
+out = "build/plot"
