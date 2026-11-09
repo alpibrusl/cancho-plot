@@ -302,3 +302,11 @@ cut written as `if ln > 9 { ln = 10; }` (a mutant of the condition only, which c
 
 **Gallery:** four charts were added (permutation importance with error bars, grouped bars of cross-validation folds, an interval plot with the zero line, bars as text); their data have the shape `ml importance`, `ml cv` and
 `stats test` print, written by `make_gallery.py`, not read from those tools: reading their JSON is slice (b).
+
+## 22. cancho-opt [measured, not supported yet]
+
+`opt minimize` prints one JSON object when it ends: `method`, `x`, `fun`, `nfev`, `nit`, `converged` (BFGS adds `jac`; SPSA says `completed`). Measured 2026-11-10 with a build of `cancho-opt` at its pin, Nelder-Mead on Rosenbrock from (-1.2, 1):
+`fun` 8.2e-10 after 159 evaluations and 85 iterations, and nothing else: **it prints no iteration, so there is no convergence curve to draw**. What can be drawn today is what a table of several runs holds (a row for each method, start or seed:
+`fun` and `nfev` as bars, in log scale once `--logy` is built), and that is the input slice (a) already reads. A convergence plot (`fun` and the step by iteration, the simplex shrinking, the BFGS gradient norm) needs `opt` to write a trace, for instance
+`--trace FILE` with a row for each iteration: a change to cancho-opt, to be designed there, with `plot --x iter --y fun --logy` as its reader. The same holds for cancho-rl and cancho-solve: a training or solve log with a row for each step is what `plot` reads.
+Also seen while measuring: `opt minimize --method spsa --x0 -1.2,1 --objective rosenbrock --maxiter 50` with the default gains ends at x = -3.8e42 (it diverges); that belongs to cancho-opt, not to plot.
