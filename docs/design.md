@@ -160,3 +160,31 @@ as written, not that another order would give other digits. `dumb` counts a titl
 fallback (`var(--series-1, #0550ae)`); their contrast against white and against `#121212` is not measured yet.
 
 **Not yet:** bars, the histogram, shaded bands, vertical markers, error bars, the diagonal; the script form; an index for `--x` when it is omitted; reading `stats` JSON directly.
+
+## 15. Slice 4: markers, bands and the diagonal [choice, before the code]
+
+    plot ... [--vline X[,X..]] [--hline Y[,Y..]] [--band LO,HI]... [--diag]
+
+At most 8 values for each of `--vline` and `--hline`, at most 4 `--band`s (the flag may be repeated), `--diag` takes no value. A value that is not a number is `plot.not-numeric`, more than the maximum
+is `plot.usage`, a band with LO above HI is `plot.range-invalid`.
+
+**The ranges.** The x range is that of the data and of the `--vline` values; the y range is that of the data, the `--hline` values and the band ends. So a marker is always inside the chart. Everything else
+(constant ranges, the guard, ticks) is as before.
+
+**`dumb`.** Under the series, in this order, later over earlier: each band fills the rows from the row of HI to the row of LO, whole width, with `:`; each `--hline` fills its row with `-`; each
+`--vline` fills its column with `|`; the diagonal joins, with the segment rule of section 13, the cell of (t0, t0) to the cell of (t1, t1), where t0 is the larger of the two lower axis ends, t1 the
+smaller of the two upper ones, and nothing is drawn unless t0 < t1; it is written with `/`.
+
+**`svg`.** After the text group and before the series, in the same order: for each band `<rect x="x0" y="Y(HI)" width="x1 - x0" height="Y(LO) - Y(HI)" fill="var(--band, currentColor)"
+fill-opacity="0.12"/>`; for each `--hline` `<path d="M x0 Y H x1" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>`; for each `--vline` `<path d="M X y1 V y2" ../>` with
+the same attributes; the diagonal `<path d="M X(t0) Y(t0) L X(t1) Y(t1)" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="1 3"/>`, with t0 and t1 as above. Numbers as in
+section 13.
+
+**Gate.** The two oracles gain the annotations (random ones in the random charts, edge cases listed); mutants of the new code must be killed.
+
+## 16. The landing page [choice]
+
+`site/index.html`, one static file with no script: what `plot` is, the three outputs (text, SVG, ticks), a gallery, and the gates. The gallery's charts are real output of the binary, made by
+`scripts/gallery.sh`-style steps (no, by `scripts/make_gallery.py`, which runs `build/plot` on the tables in `site/data/` and writes `site/gallery/*.svg` and `*.txt`), and the page embeds those files
+inline, so the page shows exactly what the tool wrote. `scripts/check_site.py` checks that every gallery file is what the binary writes now (so the page cannot go stale), that the page is well-formed XML
+and has no external reference, and that every command it shows is one of the commands that produced a file.
