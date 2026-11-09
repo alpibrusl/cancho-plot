@@ -258,3 +258,26 @@ each new kind gets a mutant check by the same throwaway measurement as section 1
 
 **Order proposed.** (a) bars with categories, grouped, both terminals, and error bars on them (items 1 and 2: this alone draws feature importance, metrics, folds and the forest plot); (b) JSON input for `stats describe` histograms and `ml` documents (items 4 and 3 from edges);
 (c) heatmap and box (5, 6); (d) the curves (7) and `--by` (8). Each is a section here before its code, as the others were.
+
+## 20. Slice 5a: bars with categories, and error bars [choice, before the code]
+
+    plot --x COL --y COL[,COL..] --with bars [--yerr COL[,COL..]] ...
+
+**Bars.** With `--with bars` each row of the table is a category: the cell of `--x` is its label, as text (quotes and bytes below 0x20 or 0x7f are refused as before), and the category's place is its row, 0 to n-1.
+Several series are grouped side by side, in the order of `--y`. The y range of the data **includes 0**, so a bar is drawn from 0 to its value (downward when it is negative). No numeric x axis: the labels of the categories take its place.
+Labels are cut to 10 bytes; one is left out when it would come less than one space (`dumb`) or less than 8 (len + 1) pixels (`svg`) after the previous one drawn.
+
+**Error bars.** `--yerr COL[,COL..]`: one column of half-lengths for each series, in order (a different count is `plot.usage`; a cell that is not a number is `plot.not-numeric`; a negative one is `plot.range-invalid`).
+They apply to every kind: on a point at the point's x, on a bar at the middle of the bar. The y range includes value - err and value + err. **Not yet:** asymmetric intervals, horizontal bars (`--horizontal`).
+
+**`dumb`.** Let n be the categories and W the width; a category's slot is the columns from s = floor(i W / n) to e = floor((i + 1) W / n), of width sw = e - s. With k series the group is bw = floor((sw - g) / k) columns a
+bar, where g is 1 when sw > k and 0 when sw = k, and starts at s + floor((sw - k bw) / 2). A chart where floor(W / n) < k is refused: `plot.size-invalid`. Bar j of category i fills, in its columns, the rows from the row of its value to the row of 0, both ends
+included (so a bar of height 0 is one row), with the glyph of series j; the rows are those of section 11. Error bars come after all the bars: the `|` glyph in the rows from the row of value + err to the row of value - err, at the column bs + floor(bw / 2) of the bar (bs its first column); for points and lines, at the column of the point. Labels
+are centred on s + floor(sw / 2), cut and placed as section 11 places the x labels (start = centre - floor(len / 2), clamped to the area). The y axis, the legend and the rest are as before.
+
+**`svg`.** sw = (x1 - x0) / n, the group is 0.8 sw wide and centred, a bar bw = 0.8 sw / k; bar j of category i starts at x0 + i sw + 0.1 sw + j bw (doubles, in this order) and is `<rect x y width height fill="var(--series-J, #HEX)"/>` with y the smaller of
+Y(v) and Y(0) and the height their difference; the rects come after the annotations of section 15. Error bars come after the series: one path for each series, `M cx Y(v+e) V Y(v-e) M cx-3 Y(v+e) h6 M cx-3 Y(v-e) h6` for each point
+(cx the middle of the bar, or X(x)), with `fill="none" stroke="currentColor" stroke-width="1"`. The x ticks of the axis group are a mark at the middle of each category, `M cx y2 v4`; the labels are `<text x="cx" y="y2 + 18" text-anchor="middle">`. A bar narrower than 1 pixel is refused with `plot.size-invalid`.
+
+**Gate.** `cancho test`, as section 18: hand-worked charts for both terminals (one series, two series, a negative bar, error bars on bars and on points, a category label that is dropped), every new refusal, and the
+size edges; then the throwaway mutant measurement of section 18 on the new code, with the rate stated.
