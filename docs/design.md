@@ -385,3 +385,20 @@ equivalent: the `kh > 0` of the refusal for a histogram with intervals (the chec
 Left out as equivalent without a test: the index `2 * ac[5]` of the upper edges, which is 0 for a histogram (it takes no intervals).
 
 **Not yet:** box plots and heatmaps (the rest of slice c, a design of their own), the curves computed by `plot` (ROC, empirical CDF, Q-Q), `--logy`, `--by`, horizontal bars.
+
+## 27. Slice 5d-1: box plots [choice, before the code]
+
+    plot --x LABEL --y MIN,Q1,MEDIAN,Q3,MAX --with box ...
+    stats describe --quantiles 0.25,0.5,0.75 --cols a,b | plot --json data.columns --x name --y min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max --with box
+
+**Input.** One row for each box: the label of the category in `--x` (text, as for bars), and exactly five columns in `--y`, in this order: the lower whisker, the first quartile, the median, the third quartile, the upper whisker (a different count of columns is `plot.usage`).
+A row that is not in order, lower <= q1 <= median <= q3 <= upper, is `plot.range-invalid`, with its line. This is the shape `stats describe` prints (`min`, `quantiles` of 0.25, 0.5 and 0.75 by their position in the list, `max`), so the JSON fields above are dotted paths with an index. The y range is that of the five columns (it does not include 0).
+
+**`dumb`.** A box takes the slot of its category and one column group (section 20's `slot` with one series: first column `gs`, width `bw`). In this order, later over earlier: the whisker, the glyph `|` at column gs + floor(bw / 2) from the row of the upper whisker to the row of the lower one; the box, the glyph `#` in the columns gs to gs + bw - 1, from the row of the
+third quartile to the row of the first, both included; the median, the glyph `=` in the same columns on the row of the median. No legend (a box has no series). A chart where floor(W / n) < 1 is `plot.size-invalid`.
+
+**`svg`.** Slot sw = (x1 - x0) / n, centre cx = x0 + (i + 0.5) sw (doubles, as before), box width 0.5 sw. After the annotations: for each box `<rect x="cx - 0.25 sw" y="Y(q3)" width="0.5 sw" height="Y(q1) - Y(q3)" fill="var(--series-1, #0550ae)" fill-opacity="0.35" stroke="currentColor" stroke-width="1"/>`;
+then one path of the whiskers and caps, `M cx Y(q3) V Y(upper) M cx Y(q1) V Y(lower) M cx-6 Y(upper) h12 M cx-6 Y(lower) h12` for each box, `fill="none" stroke="currentColor" stroke-width="1"`; then one path of the medians, `M cx-0.25 sw Y(median) h 0.5 sw` for each box, `fill="none" stroke="currentColor" stroke-width="2"`. The category marks and labels are those of bars. No legend swatch or name, and the `aria-label` says `N boxes`.
+A box narrower than 2 pixels is `plot.size-invalid`.
+
+**Gate.** `cancho test`: hand-worked charts in both terminals, the order refusals, the count refusal, the JSON path with indexes on a real `stats describe` document; the mutant measurement as in sections 18, 24 and 26.
