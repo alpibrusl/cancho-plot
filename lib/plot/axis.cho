@@ -1,0 +1,44 @@
+edition 9;
+
+module plot.axis;
+
+import plot.ticks;
+import std.buffer;
+
+// What the two terminals share (docs/design.md sections 10, 11 and 13): the axis of a range, and the size of a buffer.
+
+// the number of bytes in a buffer
+pub fn used[&h](b: buffer.Buffer) -> [] (buffer.Buffer, int) {
+    var n = 0;
+    borrow b as &q in {
+        n = buffer.size(q);
+    }
+    return (b, n);
+}
+
+// the range of the values widened by 1 each way when it is a point, and whether the ticks can stand for it (section 10): (lo, hi, ok)
+pub fn fix(lo0: float, hi0: float) -> [] (float, float, bool) {
+    var lo = lo0;
+    var hi = hi0;
+    if lo == hi {
+        lo = lo - 1.0;
+        hi = hi + 1.0;
+    }
+    var far = hi;
+    if 0.0 - lo > far {
+        far = 0.0 - lo;
+    }
+    let span = hi - lo;
+    if far > 1.0e15 || span < 1.0e-12 || far / span > 1.0e12 {
+        return (lo, hi, false);
+    }
+    return (lo, hi, true);
+}
+
+// the widened range and its ticks: (lo, hi, m, e, first, last)
+pub fn axis(lo: float, hi: float, n: int) -> [] (float, float, int, int, int, int) {
+    let (m, e) = ticks.step(hi - lo, n);
+    let (k0, k1) = ticks.enclose(lo, hi, m, e);
+    return (ticks.value(k0, m, e), ticks.value(k1, m, e), m, e, k0, k1);
+}
+

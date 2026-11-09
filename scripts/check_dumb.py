@@ -16,6 +16,7 @@ from fractions import Fraction
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLOT = os.environ.get("PLOT", os.path.join(ROOT, "build", "plot"))
 GLYPHS = "*+xo#"
+SRCS = ["lib/plot/num.cho", "lib/plot/ticks.cho", "lib/plot/csv.cho", "lib/plot/axis.cho", "lib/plot/dumb.cho", "lib/plot/svg.cho", "lib/plot/chart.cho", "tools/plot/main.cho"]
 
 
 def label(n, e):
@@ -70,14 +71,27 @@ def row(v, lo, hi, size):
     return max(0, min(size - 1, int((hi - v) * size // (hi - lo))))
 
 
-def render(xs, ys, names, W=60, H=20, title=None):
+def segment(c0, r0, c1, r1):
+    """the cells joining two cells (docs/design.md section 13): integers only, a half goes up"""
+    dc, dr = c1 - c0, r1 - r0
+    n = max(abs(dc), abs(dr))
+    sg = lambda v: (v > 0) - (v < 0)
+    return [(c0 + sg(dc) * ((2 * abs(dc) * i + n) // (2 * n)) if n else c0, r0 + sg(dr) * ((2 * abs(dr) * i + n) // (2 * n)) if n else r0) for i in range(n + 1)]
+
+
+def render(xs, ys, names, W=60, H=20, title=None, lines=False):
     xa, ya = axis(xs, 6), axis([v for col in ys for v in col], 5)
     xlo, xhi, _, xm, xe, xk0, xk1 = xa
     ylo, yhi, _, ym, ye, yk0, yk1 = ya
     grid = [[" "] * W for _ in range(H)]
     for s, col in enumerate(ys):
-        for x, y in zip(xs, col):
-            grid[row(y, ylo, yhi, H)][cell(x, xlo, xhi, W)] = GLYPHS[s]
+        pts = [(cell(x, xlo, xhi, W), row(y, ylo, yhi, H)) for x, y in zip(xs, col)]
+        if lines:
+            for (c0, r0), (c1, r1) in zip(pts, pts[1:]):
+                for c, r in segment(c0, r0, c1, r1):
+                    grid[r][c] = GLYPHS[s]
+        for c, r in pts:
+            grid[r][c] = GLYPHS[s]
     ylabels = {}
     for k in range(yk0, yk1 + 1):
         v = k * ya[2]
@@ -145,9 +159,10 @@ def gate(exe):
         nl = rng.choice(["\n", "\r\n"])
         data = "t," + ",".join(names) + nl + nl.join(dec(xs[r]) + "," + ",".join(dec(ys[j][r]) for j in range(k)) for r in range(n)) + rng.choice(["", nl])
         numeric = rng.random() < 0.3                                      # the columns by number, the last one included
-        args = (["--x", "1", "--y", ",".join(str(j + 2) for j in range(k))] if numeric else ["--x", "t", "--y", ",".join(names)]) + ["--size", "%dx%d" % (W, H)] + (["--title", title] if title is not None else [])
+        lines = rng.random() < 0.4
+        args = (["--x", "1", "--y", ",".join(str(j + 2) for j in range(k))] if numeric else ["--x", "t", "--y", ",".join(names)]) + ["--size", "%dx%d" % (W, H)] + (["--title", title] if title is not None else []) + (["--with", "lines"] if lines else rng.choice([[], ["--with", "points"]]))
         p = plot(exe, args, data)
-        want = render(xs, ys, names, W, H, title)
+        want = render(xs, ys, names, W, H, title, lines)
         if p.returncode != 0 or p.stdout.decode() != want:
             bad.append("random %d (%d points, %d series, %dx%d): exit %d\n%s\nwant\n%s" % (i, n, k, W, H, p.returncode, p.stdout.decode()[:400], want[:400]))
             if len(bad) > 2:
@@ -167,6 +182,12 @@ def gate(exe):
         bad.append("a title of 200 bytes refused")
     ok = "x,y\n1,2\n3,4\n"
     refusals = [
+        (["--x", "x", "--y", "y", "--with", "bars"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--title", "a\x01b"], ok, "plot.text-invalid"),
+        (["--x", "x", "--y", "y", "--title", "a\x7fb"], ok, "plot.text-invalid"),
+        (["--x", "x", "--y", "y", "--title", "a\x1fb"], ok, "plot.text-invalid"),
+        (["--x", "x", "--y", "y", "--title", "\u0100"], ok, None),                      # the bytes c4 80: bytes above 0x7f are text
+        (["--x", "1", "--y", "2"], "x,y\x01\n1,2\n", "plot.text-invalid"),
         (["--x", "x", "--y", "y"], 'x,y\n1,"2"\n3,4\n', "plot.csv-quote"),
         (["--x", "x", "--y", "y"], "x,y\n1,a\n3,4\n", "plot.not-numeric"),
         (["--x", "x", "--y", "y"], "x,y\n1\n3,4\n", "plot.csv-shape"),
@@ -196,7 +217,10 @@ def gate(exe):
     ]
     for args, data, rule in refusals:
         p = plot(exe, args, data)
-        if p.returncode != 2 or p.stdout or ('"%s"' % rule).encode() not in p.stderr:
+        if rule is None:
+            if p.returncode != 0:
+                bad.append("%r was refused: %r" % (args, p.stderr[:100]))
+        elif p.returncode != 2 or p.stdout or ('"%s"' % rule).encode() not in p.stderr:
             bad.append("refusal %s %r: exit %d, stderr %r" % (rule, args, p.returncode, p.stderr[:100]))
     for data, rule, line in (("x,y\n1,2\n3,4\n5,a\n", "plot.not-numeric", 4), ("x,y\n1,2\n3\n", "plot.csv-shape", 3), ("x,y\r\n1,b\r\n", "plot.not-numeric", 2)):
         p = plot(exe, ["--x", "x", "--y", "y"], data)
@@ -220,18 +244,25 @@ def gate(exe):
 
 
 MUTANTS = [
+    ("lib/plot/dumb.cho", "let cc = c0 + sc * ((2 * dc * step + m) / (2 * m));", "let cc = c0 + sc * ((2 * dc * step + m - 1) / (2 * m));"),
+    ("lib/plot/dumb.cho", "let rr = r0 + sr * ((2 * dr * step + m) / (2 * m));", "let rr = r0 + sr * ((2 * dr * step + m - 1) / (2 * m));"),
+    ("lib/plot/dumb.cho", "let rr = r0 + sr * ((2 * dr * step + m) / (2 * m));", "let rr = r0 + sr * ((2 * dr * step) / (2 * m));"),
+    # not listed, equivalent: `step <= m` to `step < m` in the segment (the last cell is the point itself, which is drawn after the segment)
+    ("lib/plot/dumb.cho", "if lines && i > 0 {", "if lines && i > 1 {"),
+    ("lib/plot/dumb.cho", "        sc = 0 - 1;\n", "        sc = 1;\n"),
+    ("lib/plot/dumb.cho", "        sr = 0 - 1;\n", "        sr = 1;\n"),
     ("lib/plot/dumb.cho", "(v - lo) * float_of(size) / (hi - lo) + 1.0e-9", "(v - lo) * float_of(size) / (hi - lo)"),
     ("lib/plot/dumb.cho", "(hi - v) * float_of(size) / (hi - lo) + 1.0e-9", "(hi - v) * float_of(size) / (hi - lo)"),
     ("lib/plot/dumb.cho", "(hi - v) * float_of(size) / (hi - lo)", "(v - lo) * float_of(size) / (hi - lo)"),
     ("lib/plot/dumb.cho", "if c > size - 1 {\n        return size - 1;", "if c > size - 2 {\n        return size - 2;"),
     ("lib/plot/dumb.cho", "if c < 0 {\n        return 0;", "if c < 1 {\n        return 1;"),
     ("lib/plot/dumb.cho", "while n > 0 && int_of(bs[n - 1]) == ' ' {", "while n > 1 && int_of(bs[n - 1]) == ' ' {"),
-    ("lib/plot/dumb.cho", "if lo == hi {\n        lo = lo - 1.0;\n        hi = hi + 1.0;", "if lo == hi {\n        lo = lo - 2.0;\n        hi = hi + 2.0;"),
-    ("lib/plot/dumb.cho", "if far > 1.0e15 || span < 1.0e-12 || far / span > 1.0e12 {", "if far > 1.0e15 || span < 1.0e-12 {"),
-    ("lib/plot/dumb.cho", "if far > 1.0e15 || span < 1.0e-12 || far / span > 1.0e12 {", "if far > 1.0e16 || span < 1.0e-12 || far / span > 1.0e12 {"),
-    ("lib/plot/dumb.cho", "return (ticks.value(k0, m, e), ticks.value(k1, m, e), m, e, k0, k1);", "return (ticks.value(k0 + 1, m, e), ticks.value(k1, m, e), m, e, k0, k1);"),
-    ("lib/plot/dumb.cho", "let (xlo2, xhi2, xm, xe, xk0, xk1) = axis(xl0, xh0, 6);", "let (xlo2, xhi2, xm, xe, xk0, xk1) = axis(xl0, xh0, 5);"),
-    ("lib/plot/dumb.cho", "let (ylo2, yhi2, ym, ye, yk0, yk1) = axis(yl0, yh0, 5);", "let (ylo2, yhi2, ym, ye, yk0, yk1) = axis(yl0, yh0, 6);"),
+    ("lib/plot/axis.cho", "if lo == hi {\n        lo = lo - 1.0;\n        hi = hi + 1.0;", "if lo == hi {\n        lo = lo - 2.0;\n        hi = hi + 2.0;"),
+    ("lib/plot/axis.cho", "if far > 1.0e15 || span < 1.0e-12 || far / span > 1.0e12 {", "if far > 1.0e15 || span < 1.0e-12 {"),
+    ("lib/plot/axis.cho", "if far > 1.0e15 || span < 1.0e-12 || far / span > 1.0e12 {", "if far > 1.0e16 || span < 1.0e-12 || far / span > 1.0e12 {"),
+    ("lib/plot/axis.cho", "return (ticks.value(k0, m, e), ticks.value(k1, m, e), m, e, k0, k1);", "return (ticks.value(k0 + 1, m, e), ticks.value(k1, m, e), m, e, k0, k1);"),
+    ("lib/plot/dumb.cho", "let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6);", "let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 5);"),
+    ("lib/plot/dumb.cho", "let (ylo2, yhi2, ym, ye, yk0, yk1) = axis.axis(yl0, yh0, 5);", "let (ylo2, yhi2, ym, ye, yk0, yk1) = axis.axis(yl0, yh0, 6);"),
     ("lib/plot/dumb.cho", "let glyphs = \"*+xo#\";", "let glyphs = \"*+xo@\";"),
     ("lib/plot/dumb.cho", "grid[row * w + col] = glyphs[j];", "grid[row * w + col] = glyphs[0];"),
     ("lib/plot/dumb.cho", "var pad = (w - len(title)) / 2;", "var pad = (w - len(title)) / 3;"),
@@ -245,9 +276,9 @@ MUTANTS = [
     ("lib/plot/dumb.cho", "if ln <= w && start >= prev_end + 1 {", "if ln <= w && start >= prev_end + 2 {"),
     ("lib/plot/dumb.cho", "prev_end = start + ln;", "prev_end = start + ln + 1;"),
     ("lib/plot/dumb.cho", "line = buffer.append(heap, line, \"  \");", "line = buffer.append(heap, line, \" \");"),
-    ("lib/plot/dumb.cho", "if code == 0 && n > 5000 {", "if code == 0 && n > 4999 {"),
-    ("lib/plot/dumb.cho", "if ycount > 5 {", "if ycount > 4 {"),
-    ("lib/plot/dumb.cho", "line = row + 2;", "line = row + 1;"),
+    ("lib/plot/chart.cho", "if code == 0 && n > 5000 {", "if code == 0 && n > 4999 {"),
+    ("lib/plot/chart.cho", "if ycount > 5 {", "if ycount > 4 {"),
+    ("lib/plot/chart.cho", "line = row + 2;", "line = row + 1;"),
     ("lib/plot/csv.cho", "if i > from && int_of(text[i - 1]) == 13 {", "if i > from && int_of(text[i - 1]) == 14 {"),
     ("lib/plot/csv.cho", "if v >= 1 && v <= n {", "if v >= 1 && v < n {"),
     # not listed, equivalent: `v >= 1` to `v >= 0` in csv.column (the spec 0 would give column -1, which is also what "not there" answers)
@@ -257,17 +288,17 @@ MUTANTS = [
     ("lib/plot/ticks.cho", "if float_of(last) < b {\n        last = last + 1;", "if float_of(last) < b {\n        last = last + 2;"),
     ("lib/plot/ticks.cho", "    return n / pow10(0 - e);", "    return n * pow10(0 - e);"),
     ("tools/plot/main.cho", "if len(value) > 200 {", "if len(value) > 199 {"),
-    ("tools/plot/main.cho", "if sw < 10 || sw > 200 || sh < 5 || sh > 60 {", "if sw < 11 || sw > 200 || sh < 5 || sh > 60 {"),
-    ("tools/plot/main.cho", "if sw < 10 || sw > 200 || sh < 5 || sh > 60 {", "if sw < 10 || sw > 201 || sh < 5 || sh > 60 {"),
-    ("tools/plot/main.cho", "if sw < 10 || sw > 200 || sh < 5 || sh > 60 {", "if sw < 10 || sw > 200 || sh < 6 || sh > 60 {"),
-    ("tools/plot/main.cho", "if sw < 10 || sw > 200 || sh < 5 || sh > 60 {", "if sw < 10 || sw > 200 || sh < 5 || sh > 61 {"),
+    ("tools/plot/main.cho", "var ok = sw >= 10 && sw <= 200 && sh >= 5 && sh <= 60;", "var ok = sw >= 11 && sw <= 200 && sh >= 5 && sh <= 60;"),
+    ("tools/plot/main.cho", "var ok = sw >= 10 && sw <= 200 && sh >= 5 && sh <= 60;", "var ok = sw >= 10 && sw <= 201 && sh >= 5 && sh <= 60;"),
+    ("tools/plot/main.cho", "var ok = sw >= 10 && sw <= 200 && sh >= 5 && sh <= 60;", "var ok = sw >= 10 && sw <= 200 && sh >= 6 && sh <= 60;"),
+    ("tools/plot/main.cho", "var ok = sw >= 10 && sw <= 200 && sh >= 5 && sh <= 60;", "var ok = sw >= 10 && sw <= 200 && sh >= 5 && sh <= 61;"),
 ]
 
 
 def mutants():
     cancho = os.environ["CANCHO"]
     killed = survivors = 0
-    srcs = ["lib/plot/num.cho", "lib/plot/ticks.cho", "lib/plot/csv.cho", "lib/plot/dumb.cho", "tools/plot/main.cho"]
+    srcs = SRCS
     for path, old, new in MUTANTS:
         with tempfile.TemporaryDirectory() as d:
             for f in srcs:
@@ -298,6 +329,6 @@ if __name__ == "__main__":
         print("FAIL:", b)
     if bad:
         sys.exit(1)
-    print("check_dumb: ok (%d hand charts, 200 random charts, 26 refusals, 200 garbage inputs)" % len(HAND))
+    print("check_dumb: ok (%d hand charts, 200 random charts, 32 refusals, 200 garbage inputs)" % len(HAND))
     if "--mutants" in sys.argv:
         mutants()

@@ -1,0 +1,189 @@
+edition 9;
+
+module plot.chart;
+
+import plot.axis;
+import plot.csv;
+import plot.dumb;
+import plot.num;
+import plot.svg;
+import std.buffer;
+
+// A table in memory in, a chart out (docs/design.md sections 11 and 13). The codes `draw` answers with: 0 done; 1 a double quote; 2 a cell that is not a number; 3 a line with the wrong number of cells;
+// 4 no rows; 5 a column that is not there; 6 more than 5,000 rows; 7 a range the ticks cannot stand for; 8 more than 5 series; 9 a plot area under 20 (svg); 10 a control byte in the title or a name.
+// The caller maps them to rule tags.
+
+// does the text hold a byte below 0x20 or the byte 0x7f
+fn has_control[&t](text: &t [byte]) -> [] bool {
+    var i = 0;
+    while i < len(text) {
+        let c = int_of(text[i]);
+        if c < 32 || c == 127 {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// Read the table in `text` and draw it: x from the column `xspec`, the series from the columns of the comma-separated `yspec`. Answers (code, line, chart): `line` is the line of the table the code is about (from 1).
+pub fn draw[&h, &t, &x, &y, &z](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, svg_term: bool) -> [heap] (int, int, buffer.Buffer) {
+    let none = buffer.empty(heap, 1);
+    if len(text) == 0 {
+        return (4, 0, none);
+    }
+    if csv.has_quote(text) {
+        return (1, 0, none);
+    }
+    if has_title && has_control(title) {
+        return (10, 0, none);
+    }
+    let hend = csv.line_end(text, 0);
+    // the series asked for
+    var ycount = 1;
+    var s = 0;
+    while s < len(yspec) {
+        if int_of(yspec[s]) == ',' {
+            ycount = ycount + 1;
+        }
+        s = s + 1;
+    }
+    if ycount > 5 {
+        return (8, 0, none);
+    }
+    var xcol = csv.column(text, 0, hend, xspec);
+    var ycols = 0 - 1;
+    var code = 0;
+    var line = 0;
+    var out = none;
+    region r {
+        let yc = alloc_slice[r](5, 0);
+        let ns = alloc_slice[r](5, 0);
+        let ne = alloc_slice[r](5, 0);
+        var from = 0;
+        var j = 0;
+        var p = 0;
+        while p <= len(yspec) && code == 0 {
+            if p == len(yspec) || int_of(yspec[p]) == ',' {
+                let c = csv.column(text, 0, hend, yspec[from..p]);
+                if c < 0 {
+                    code = 5;
+                } else {
+                    yc[j] = c;
+                    let (a, b) = csv.cell(text, 0, hend, c);
+                    ns[j] = a;
+                    ne[j] = b;
+                    if has_control(text[a..b]) {
+                        code = 10;
+                    }
+                    j = j + 1;
+                }
+                from = p + 1;
+            }
+            p = p + 1;
+        }
+        if xcol < 0 {
+            code = 5;
+        }
+        // the rows
+        var n = 0;
+        var at = csv.next_line(text, hend);
+        while at < len(text) {
+            n = n + 1;
+            at = csv.next_line(text, csv.line_end(text, at));
+        }
+        if code == 0 && n == 0 {
+            code = 4;
+        }
+        if code == 0 && n > 5000 {
+            code = 6;
+        }
+        if code == 0 {
+            let ncols = csv.cells(text, 0, hend);
+            let xsb = box_slice(heap, n, 0.0);
+            let ysb = box_slice(heap, n * ycount, 0.0);
+            borrow mut xsb as &!xw in {
+                borrow mut ysb as &!yw in {
+                    let xs = contents(xw);
+                    let ys = contents(yw);
+                    var row = 0;
+                    at = csv.next_line(text, hend);
+                    while row < n && code == 0 {
+                        let end = csv.line_end(text, at);
+                        if csv.cells(text, at, end) != ncols {
+                            code = 3;
+                            line = row + 2;
+                        } else {
+                            let (a, b) = csv.cell(text, at, end, xcol);
+                            let (ok, v) = num.number(text[a..b]);
+                            if !ok {
+                                code = 2;
+                                line = row + 2;
+                            } else {
+                                xs[row] = v;
+                            }
+                            var q = 0;
+                            while q < ycount && code == 0 {
+                                let (c, d) = csv.cell(text, at, end, yc[q]);
+                                let (ok2, v2) = num.number(text[c..d]);
+                                if !ok2 {
+                                    code = 2;
+                                    line = row + 2;
+                                } else {
+                                    ys[q * n + row] = v2;
+                                }
+                                q = q + 1;
+                            }
+                        }
+                        at = csv.next_line(text, end);
+                        row = row + 1;
+                    }
+                    if code == 0 {
+                        var xlo = xs[0];
+                        var xhi = xs[0];
+                        var ylo = ys[0];
+                        var yhi = ys[0];
+                        var i = 0;
+                        while i < n {
+                            if xs[i] < xlo {
+                                xlo = xs[i];
+                            }
+                            if xs[i] > xhi {
+                                xhi = xs[i];
+                            }
+                            i = i + 1;
+                        }
+                        i = 0;
+                        while i < n * ycount {
+                            if ys[i] < ylo {
+                                ylo = ys[i];
+                            }
+                            if ys[i] > yhi {
+                                yhi = ys[i];
+                            }
+                            i = i + 1;
+                        }
+                        let (a, b, xok) = axis.fix(xlo, xhi);
+                        let (c, d, yok) = axis.fix(ylo, yhi);
+                        if !xok || !yok {
+                            code = 7;
+                        } else {
+                            buffer.drop(heap, out);
+                            if svg_term {
+                        let (rc, chart) = svg.render(heap, text, xs, ys, n, ycount, ns, ne, w, hh, title, has_title, lines);
+                        code = rc;
+                        out = chart;
+                    } else {
+                        out = dumb.render(heap, text, xs, ys, n, ycount, ns, ne, w, hh, title, has_title, lines);
+                    }
+                        }
+                    }
+
+                }
+            }
+            unbox_slice(heap, ysb);
+            unbox_slice(heap, xsb);
+        }
+    }
+    return (code, line, out);
+}

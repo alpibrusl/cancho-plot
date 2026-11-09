@@ -1,0 +1,320 @@
+edition 9;
+
+module plot.svg;
+
+import plot.axis;
+import plot.ticks;
+import std.buffer;
+import std.fmt;
+
+// The SVG terminal (docs/design.md section 13): the points of a table in, a standalone SVG document out. One element a line; every number written with two decimals; no clock, no id, no random.
+
+// `x` with 2 decimals, correctly rounded from the double, trailing zeros and a bare point dropped, appended to `b` (every coordinate is at least 12, so there is no `-0`)
+fn num[&h](heap: &!h Heap, b: buffer.Buffer, x: float) -> [heap] buffer.Buffer {
+    var out = b;
+    region a {
+        let sc = alloc_slice[a](400, byte_of(0));
+        let k = fmt.float_fixed_into(sc, x, 2);
+        var end = k;
+        if k > 0 {
+            while end > 0 && int_of(sc[end - 1]) == '0' {
+                end = end - 1;
+            }
+            if end > 0 && int_of(sc[end - 1]) == '.' {
+                end = end - 1;
+            }
+            out = buffer.append(heap, out, sc[0..end]);
+        }
+    }
+    return out;
+}
+
+fn numi[&h](heap: &!h Heap, b: buffer.Buffer, v: int) -> [heap] buffer.Buffer {
+    return num(heap, b, float_of(v));
+}
+
+// `text` with & < > " escaped
+fn esc[&h, &t](heap: &!h Heap, b: buffer.Buffer, text: &t [byte]) -> [heap] buffer.Buffer {
+    var out = b;
+    var i = 0;
+    while i < len(text) {
+        let c = int_of(text[i]);
+        if c == '&' {
+            out = buffer.append(heap, out, "&amp;");
+        } else if c == '<' {
+            out = buffer.append(heap, out, "&lt;");
+        } else if c == '>' {
+            out = buffer.append(heap, out, "&gt;");
+        } else if c == '"' {
+            out = buffer.append(heap, out, "&quot;");
+        } else {
+            out = buffer.push(heap, out, text[i]);
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+fn color(j: int) -> [] &static [byte] {
+    if j == 0 {
+        return "0550ae";
+    }
+    if j == 1 {
+        return "bc4c00";
+    }
+    if j == 2 {
+        return "1a7f37";
+    }
+    if j == 3 {
+        return "8250df";
+    }
+    return "cf222e";
+}
+
+fn put[&h](heap: &!h Heap, b: buffer.Buffer, s: &static [byte]) -> [heap] buffer.Buffer {
+    return buffer.append(heap, b, s);
+}
+
+fn nl[&h](heap: &!h Heap, b: buffer.Buffer) -> [heap] buffer.Buffer {
+    return buffer.push(heap, b, byte_of(10));
+}
+
+// ` fill="none" stroke="var(--series-J, #HEX)"` for series j
+fn stroke[&h](heap: &!h Heap, b: buffer.Buffer, j: int) -> [heap] buffer.Buffer {
+    var o = put(heap, b, " fill=\"none\" stroke=\"var(--series-");
+    o = buffer.push_nat(heap, o, j + 1);
+    o = put(heap, o, ", #");
+    o = put(heap, o, color(j));
+    return put(heap, o, ")\"");
+}
+
+// Answers (code, document): code 0, or 9 when the plot area would be under 20 wide or high.
+pub fn render[&h, &t, &a, &b, &c, &d, &z](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool) -> [heap] (int, buffer.Buffer) {
+    var xlo = xs[0];
+    var xhi = xs[0];
+    var ylo = ys[0];
+    var yhi = ys[0];
+    var i = 0;
+    while i < n {
+        if xs[i] < xlo {
+            xlo = xs[i];
+        }
+        if xs[i] > xhi {
+            xhi = xs[i];
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < k * n {
+        if ys[i] < ylo {
+            ylo = ys[i];
+        }
+        if ys[i] > yhi {
+            yhi = ys[i];
+        }
+        i = i + 1;
+    }
+    let (xl0, xh0, xok) = axis.fix(xlo, xhi);
+    let (yl0, yh0, yok) = axis.fix(ylo, yhi);
+    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6);
+    let (ylo2, yhi2, ym, ye, yk0, yk1) = axis.axis(yl0, yh0, 5);
+    // the width of the longest y label decides the left margin
+    var g = 0;
+    var q = yk0;
+    while q <= yk1 {
+        let (lb, ln) = axis.used(ticks.label(heap, buffer.empty(heap, 16), q, ym, ye));
+        buffer.drop(heap, lb);
+        if ln > g {
+            g = ln;
+        }
+        q = q + 1;
+    }
+    var top = 12;
+    if has_title {
+        top = 36;
+    }
+    let x0 = 12 + 8 * g;
+    let x1 = w - 16;
+    let y1 = top;
+    let y2 = hh - 44;
+    var out = buffer.empty(heap, 8192);
+    if x1 - x0 < 20 || y2 - y1 < 20 {
+        return (9, out);
+    }
+    let x0f = float_of(x0);
+    let y1f = float_of(y1);
+    let pw = float_of(x1 - x0);
+    let ph = float_of(y2 - y1);
+    out = put(heap, out, "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ");
+    out = numi(heap, out, w);
+    out = put(heap, out, " ");
+    out = numi(heap, out, hh);
+    out = put(heap, out, "\" width=\"");
+    out = numi(heap, out, w);
+    out = put(heap, out, "\" height=\"");
+    out = numi(heap, out, hh);
+    out = put(heap, out, "\" role=\"img\" aria-label=\"");
+    if has_title {
+        out = esc(heap, out, title);
+        out = put(heap, out, ": ");
+    }
+    out = buffer.push_nat(heap, out, k);
+    out = put(heap, out, " series, ");
+    out = buffer.push_nat(heap, out, n);
+    out = put(heap, out, " points\">");
+    out = nl(heap, out);
+    out = put(heap, out, "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\">");
+    out = nl(heap, out);
+    out = put(heap, out, "<path d=\"M ");
+    out = numi(heap, out, x0);
+    out = put(heap, out, " ");
+    out = numi(heap, out, y1);
+    out = put(heap, out, " V ");
+    out = numi(heap, out, y2);
+    out = put(heap, out, " H ");
+    out = numi(heap, out, x1);
+    out = put(heap, out, "\"/>");
+    out = nl(heap, out);
+    q = yk0;
+    while q <= yk1 {
+        let yy = y1f + (yhi2 - ticks.value(q, ym, ye)) / (yhi2 - ylo2) * ph;
+        out = put(heap, out, "<path d=\"M ");
+        out = numi(heap, out, x0);
+        out = put(heap, out, " ");
+        out = num(heap, out, yy);
+        out = put(heap, out, " h-4\"/>");
+        out = nl(heap, out);
+        q = q + 1;
+    }
+    q = xk0;
+    while q <= xk1 {
+        let xx = x0f + (ticks.value(q, xm, xe) - xlo2) / (xhi2 - xlo2) * pw;
+        out = put(heap, out, "<path d=\"M ");
+        out = num(heap, out, xx);
+        out = put(heap, out, " ");
+        out = numi(heap, out, y2);
+        out = put(heap, out, " v4\"/>");
+        out = nl(heap, out);
+        q = q + 1;
+    }
+    out = put(heap, out, "</g>");
+    out = nl(heap, out);
+    out = put(heap, out, "<g font-family=\"sans-serif\" font-size=\"12\" fill=\"currentColor\">");
+    out = nl(heap, out);
+    if has_title {
+        out = put(heap, out, "<text x=\"");
+        out = num(heap, out, float_of(w) / 2.0);
+        out = put(heap, out, "\" y=\"20\" text-anchor=\"middle\" font-size=\"14\">");
+        out = esc(heap, out, title);
+        out = put(heap, out, "</text>");
+        out = nl(heap, out);
+    }
+    q = yk0;
+    while q <= yk1 {
+        let yy = y1f + (yhi2 - ticks.value(q, ym, ye)) / (yhi2 - ylo2) * ph;
+        out = put(heap, out, "<text x=\"");
+        out = numi(heap, out, x0 - 8);
+        out = put(heap, out, "\" y=\"");
+        out = num(heap, out, yy + 4.0);
+        out = put(heap, out, "\" text-anchor=\"end\">");
+        out = ticks.label(heap, out, q, ym, ye);
+        out = put(heap, out, "</text>");
+        out = nl(heap, out);
+        q = q + 1;
+    }
+    var prev = 0.0;
+    var have_prev = false;
+    q = xk0;
+    while q <= xk1 {
+        let xx = x0f + (ticks.value(q, xm, xe) - xlo2) / (xhi2 - xlo2) * pw;
+        let (lb, ln) = axis.used(ticks.label(heap, buffer.empty(heap, 16), q, xm, xe));
+        if !have_prev || xx - prev >= 8.0 * float_of(ln + 1) {
+            out = put(heap, out, "<text x=\"");
+            out = num(heap, out, xx);
+            out = put(heap, out, "\" y=\"");
+            out = numi(heap, out, y2 + 18);
+            out = put(heap, out, "\" text-anchor=\"middle\">");
+            borrow lb as &lbb in {
+                out = buffer.append(heap, out, buffer.bytes(lbb));
+            }
+            out = put(heap, out, "</text>");
+            out = nl(heap, out);
+            prev = xx;
+            have_prev = true;
+        }
+        buffer.drop(heap, lb);
+        q = q + 1;
+    }
+    var j = 0;
+    while j < k {
+        out = put(heap, out, "<text x=\"");
+        out = numi(heap, out, x0 + 150 * j + 14);
+        out = put(heap, out, "\" y=\"");
+        out = numi(heap, out, hh - 8);
+        out = put(heap, out, "\">");
+        out = esc(heap, out, text[ns[j]..ne[j]]);
+        out = put(heap, out, "</text>");
+        out = nl(heap, out);
+        j = j + 1;
+    }
+    out = put(heap, out, "</g>");
+    out = nl(heap, out);
+    j = 0;
+    while j < k {
+        out = put(heap, out, "<path d=\"");
+        i = 0;
+        while i < n {
+            let px = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
+            let py = y1f + (yhi2 - ys[j * n + i]) / (yhi2 - ylo2) * ph;
+            if lines {
+                if i == 0 {
+                    out = put(heap, out, "M ");
+                } else {
+                    out = put(heap, out, " L ");
+                }
+                out = num(heap, out, px);
+                out = put(heap, out, " ");
+                out = num(heap, out, py);
+            } else {
+                if i > 0 {
+                    out = put(heap, out, " ");
+                }
+                out = put(heap, out, "M ");
+                out = num(heap, out, px);
+                out = put(heap, out, " ");
+                out = num(heap, out, py);
+                out = put(heap, out, " h0");
+            }
+            i = i + 1;
+        }
+        if lines && n == 1 {
+            out = put(heap, out, " h0");
+        }
+        out = put(heap, out, "\"");
+        out = stroke(heap, out, j);
+        if lines {
+            out = put(heap, out, " stroke-width=\"1.5\" stroke-linecap=\"round\"/>");
+        } else {
+            out = put(heap, out, " stroke-width=\"4\" stroke-linecap=\"round\"/>");
+        }
+        out = nl(heap, out);
+        j = j + 1;
+    }
+    j = 0;
+    while j < k {
+        out = put(heap, out, "<rect x=\"");
+        out = numi(heap, out, x0 + 150 * j);
+        out = put(heap, out, "\" y=\"");
+        out = numi(heap, out, hh - 17);
+        out = put(heap, out, "\" width=\"10\" height=\"10\" fill=\"var(--series-");
+        out = buffer.push_nat(heap, out, j + 1);
+        out = put(heap, out, ", #");
+        out = put(heap, out, color(j));
+        out = put(heap, out, ")\"/>");
+        out = nl(heap, out);
+        j = j + 1;
+    }
+    out = put(heap, out, "</svg>");
+    out = nl(heap, out);
+    return (0, out);
+}

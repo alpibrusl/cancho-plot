@@ -3,13 +3,12 @@ edition 9;
 // `plot` -- plots as a command line (docs/design.md). Built so far:
 //
 //     plot ticks LO HI [N]     the nice ticks of the range [LO, HI] aimed at N intervals (default 5), one label a line
-//     plot --x COL --y COL[,COL..] [--term dumb] [--size WxH] [--title TEXT] < table.csv     a chart of characters (docs/design.md section 11)
+//     plot --x COL --y COL[,COL..] [--with points|lines] [--term dumb|svg] [--size WxH] [--title TEXT] < table.csv     a chart (docs/design.md sections 11 and 13)
 //
 // A refusal prints nothing on standard output and, on standard error, one JSON line `{"error":"plot.<rule>","message":"...","repair":"..."}`; exit status 2.
 // Authority: arguments, standard input, standard output and standard error; no file, no network, no clock.
 
-import plot.csv;
-import plot.dumb;
+import plot.chart;
 import plot.num;
 import plot.ticks;
 import std.buffer;
@@ -142,8 +141,10 @@ fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_
     var yspec = "";
     var title = "";
     var has_title = false;
-    var w = 60;
-    var hh = 20;
+    var sw = 0 - 1;
+    var sh = 0 - 1;
+    var svg_term = false;
+    var lines = false;
     var k = 1;
     var seen_x = false;
     var seen_y = false;
@@ -166,23 +167,56 @@ fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_
             title = value;
             has_title = true;
         } else if bytes.equal(flag, "--term") {
-            if !bytes.equal(value, "dumb") {
-                return refuse(io, "plot.usage", "the only terminal built so far is dumb", "--term dumb");
+            if bytes.equal(value, "svg") {
+                svg_term = true;
+            } else if bytes.equal(value, "dumb") {
+                svg_term = false;
+            } else {
+                return refuse(io, "plot.usage", "the terminals are dumb and svg", "--term svg");
+            }
+        } else if bytes.equal(flag, "--with") {
+            if bytes.equal(value, "lines") {
+                lines = true;
+            } else if bytes.equal(value, "points") {
+                lines = false;
+            } else {
+                return refuse(io, "plot.usage", "--with takes points or lines", "--with lines");
             }
         } else if bytes.equal(flag, "--size") {
-            let (sw, sh) = size_of(value);
-            if sw < 10 || sw > 200 || sh < 5 || sh > 60 {
-                return refuse(io, "plot.size-invalid", "the size is WxH with W from 10 to 200 and H from 5 to 60", "--size 60x20");
+            let (a, b) = size_of(value);
+            sw = a;
+            sh = b;
+            if a < 0 || b < 0 {
+                return refuse(io, "plot.size-invalid", "the size is WxH", "--size 60x20");
             }
-            w = sw;
-            hh = sh;
         } else {
-            return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --term --size --title");
+            return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --with --term --size --title");
         }
         k = k + 2;
     }
     if !seen_x || !seen_y {
         return refuse(io, "plot.usage", "--x and --y are needed", "plot --x day --y net < table.csv");
+    }
+    // the size: characters for dumb, pixels for svg
+    var w = 60;
+    var hh = 20;
+    if svg_term {
+        w = 640;
+        hh = 400;
+    }
+    if sw >= 0 {
+        var ok = sw >= 10 && sw <= 200 && sh >= 5 && sh <= 60;
+        if svg_term {
+            ok = sw >= 100 && sw <= 2000 && sh >= 100 && sh <= 1200;
+        }
+        if !ok {
+            if svg_term {
+                return refuse(io, "plot.size-invalid", "for svg the size is WxH pixels, W from 100 to 2000 and H from 100 to 1200", "--size 640x400");
+            }
+            return refuse(io, "plot.size-invalid", "for dumb the size is WxH characters, W from 10 to 200 and H from 5 to 60", "--size 60x20");
+        }
+        w = sw;
+        hh = sh;
     }
     let (text, big) = read_all(heap, io);
     var status = 0;
@@ -190,7 +224,7 @@ fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_
         status = refuse(io, "plot.too-many-points", "the input is longer than 16 MiB", "plot fewer rows");
     } else {
         borrow text as &tb in {
-            let (code, line, chart) = dumb.draw(heap, buffer.bytes(tb), xspec, yspec, w, hh, title, has_title);
+            let (code, line, chart) = chart.draw(heap, buffer.bytes(tb), xspec, yspec, w, hh, title, has_title, lines, svg_term);
             if code == 0 {
                 borrow chart as &cb in {
                     let wr = buffer.write(io, cb);
@@ -209,8 +243,12 @@ fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_
                 status = refuse(io, "plot.too-many-points", "more than 5000 rows", "plot fewer rows");
             } else if code == 7 {
                 status = refuse(io, "plot.range-invalid", "a range is beyond 1e15 of zero, narrower than 1e-12, or 1e12 times narrower than its distance from zero", "plot the difference from a base value");
-            } else {
+            } else if code == 8 {
                 status = refuse(io, "plot.too-many-series", "more than 5 series", "plot at most 5 columns");
+            } else if code == 9 {
+                status = refuse(io, "plot.size-invalid", "the plot area would be under 20 pixels wide or high; the labels and margins take the rest", "a larger --size");
+            } else {
+                status = refuse(io, "plot.text-invalid", "the title or a series name has a control byte", "remove it");
             }
             buffer.drop(heap, chart);
         }

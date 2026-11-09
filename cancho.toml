@@ -1,9 +1,9 @@
 [package]
 name = "plot"
-cancho = "695e8f9ef8f1fda9d9489a72858a55cdfe86bc86"   # the compiler at the time of writing (cancho main, 2026-11-09); move it when a feature needs a later one
+cancho = "9934b11fa2962b6d6497e7794a0c99f9aacdb694"   # the compiler every gate here was run with (cancho main, 2026-11-06); move it when a feature needs a later one
 
 [[bin]]
 name = "plot"
-sources = ["lib/plot", "tools/plot"]   # lib/plot/{num,ticks,csv,dumb}.cho, tools/plot/main.cho
+sources = ["lib/plot", "tools/plot"]   # lib/plot/{num,ticks,csv,axis,dumb,svg,chart}.cho, tools/plot/main.cho
 std = true
 out = "build/plot"

@@ -138,8 +138,25 @@ the escaped title and `: ` if there is one, then `K series, N points` (`1 series
 left out when X is less than 8 (len + 1) pixels after the previous one drawn, len being its length), and the legend names (`x="x0 + 150 j + 14" y="H - 8"`); then for each series a path with
 `fill="none" stroke="var(--series-J, #HEX)"`, J from 1 and HEX one of `0550ae`, `bc4c00`, `1a7f37`, `8250df`, `cf222e`: for lines `d="M X Y L X Y .."` with `stroke-width="1.5" stroke-linecap="round"` (one
 point is `M X Y h0`), for points `d="M X Y h0 M X Y h0 .."` with `stroke-width="4" stroke-linecap="round"`; then the legend swatches `<rect x="x0 + 150 j" y="H - 17" width="10" height="10" fill=".."/>`; then
-`</svg>`. A number is written with 2 decimals, correctly rounded from the double (a tie goes to the even digit), trailing zeros and a bare point dropped, `-0` written `0`. Text is escaped (`&`, `<`,
+`</svg>`. A number is written with 2 decimals, correctly rounded from the double (a tie goes to the even digit), trailing zeros and a bare point dropped (every coordinate is at least 12, so a `-0` cannot come up). Text is escaped (`&`, `<`,
 `>`, `"` as `&amp;`, `&lt;`, `&gt;`, `&quot;`). No clock, no id, no random: the same table and flags give the same bytes.
 
 **Gate.** `scripts/check_dumb.py` gains `--with lines`; `scripts/check_svg.py` renders with an independent implementation (Python floats in the order above, ticks from fractions) 200 random charts and
 hand-checked fragments, and the refusals; mutants of the sources must be killed. The SVG is also well-formed XML (`xml.dom.minidom` in the gate, not in the tool).
+
+## 14. Slice 3, built [measured]
+
+`--with lines` for both terminals and `--term svg`, as section 13 says; the sources are now `num`, `ticks`, `csv`, `axis` (what the terminals share), `dumb`, `svg`, `chart` (reading the table and
+choosing the terminal) and `tools/plot/main.cho`. Gates: `check_dumb.py` (lines as well as points in its 200 random charts; 32 refusals), `check_svg.py` (hand fragments worked out from the
+layout, 200 random charts compared line by line with an independent implementation and parsed as XML, 14 refusals, 100 garbage tables), `check_ticks.py`. Mutants: `check_svg.py` 41 killed, 0
+survived, plus one equivalent in the script; `check_dumb.py` 46 killed (the 8 new ones are for the line segments; two more are equivalent and explained in the script), `check_ticks.py` 15. **Correction:** `cancho.toml` first pinned `695e8f9e`, the compiler of the checkout, but every gate was run with `9934b11f`; the pin says what was run.
+
+**What the first mutants found, fixed by a case each.** (1) No chart had a plot area of exactly 20 pixels, so `< 20` and `< 21` looked the same: 7-character labels at W = 104 now. (2) No x labels
+were exactly `8 (len + 1)` pixels apart: x from 0 to 2 at W = 180 now. (3) Only one control byte was refused, so the edges 0x1f and 0x7f were free; and no title had a byte above 0x7f, so `U+0100` (c4 80)
+now has to be accepted. (4) One piece of the specification was dead: a coordinate is never below 12, so `-0` cannot be written; the branch that handled it is gone and the design says why.
+
+**Limits.** The geometry is computed in doubles in the order of section 13; the oracle repeats the same operations on Python floats, which are the same IEEE doubles, so this checks the arithmetic is
+as written, not that another order would give other digits. `dumb` counts a title by bytes, not characters, so a UTF-8 title is centred a little to the left of true. Colours are CSS variables with a
+fallback (`var(--series-1, #0550ae)`); their contrast against white and against `#121212` is not measured yet.
+
+**Not yet:** bars, the histogram, shaded bands, vertical markers, error bars, the diagonal; the script form; an index for `--x` when it is omitted; reading `stats` JSON directly.

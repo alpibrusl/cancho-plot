@@ -128,7 +128,7 @@ def dec(x):
     return label(n, -d) if d else str(n)
 
 
-SRCS = ["lib/plot/num.cho", "lib/plot/ticks.cho", "lib/plot/csv.cho", "lib/plot/dumb.cho", "tools/plot/main.cho"]
+SRCS = ["lib/plot/num.cho", "lib/plot/ticks.cho", "lib/plot/csv.cho", "lib/plot/axis.cho", "lib/plot/dumb.cho", "lib/plot/svg.cho", "lib/plot/chart.cho", "tools/plot/main.cho"]
 MUTANTS = [
     ("lib/plot/ticks.cho", "if f < 1.5 + 1.0e-9 {", "if f < 1.4 + 1.0e-9 {"),
     ("lib/plot/ticks.cho", "if f < 1.5 + 1.0e-9 {", "if f < 1.5 {"),
