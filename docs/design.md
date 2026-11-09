@@ -75,3 +75,29 @@ script with the reason. **A bug the first version had, found by the gate** once 
 the tick 0.29 (0.29 * 100 is 28.999999999999996 in a float); both ends are widened now, and the two cases are in the table.
 
 **Not yet:** `--term dumb`, the SVG, the other kinds, the script form, the data input.
+
+## 11. Slice 2: `plot --term dumb`, points from CSV on standard input [choice, before the code]
+
+The text terminal comes first because it makes every later drawing step testable as exact text (section 8).
+
+    plot --x COL --y COL[,COL..] [--term dumb] [--size WxH] [--title TEXT] < data.csv
+
+**Input.** CSV with a header line (`,` between cells, `\n` or `\r\n` between lines); a column is named by its header or numbered from 1. A cell with a double quote is refused
+(`plot.csv-quote`: quoted cells wait for a reader that handles them); a cell that is not a decimal number as JSON writes it is refused with its line (`plot.not-numeric`); a short line is
+`plot.csv-shape`. At most 5 series (`plot.too-many-series`), at most 5,000 rows (`plot.too-many-points`). No row, or no column of that name: `plot.empty`, `plot.column-missing`.
+
+**Axes.** Each axis takes the range of its data. That range gets the step of section 10 (aimed at 5 intervals for y and 6 for x) and is widened to the multiples of the step that enclose it; a
+constant series is first widened by 1 each way. The axis labels are the ticks (section 10) inside the widened range, which are all its multiples.
+
+**The grid.** `--size WxH` is the plot area in characters, default 60x20, W from 10 to 200, H from 5 to 60 (`plot.size-invalid`). A point (x, y) falls in column floor((x - xlo) * W / (xhi - xlo)) and
+row floor((yhi - y) * H / (yhi - ylo)), both clamped to the last cell (tolerance 1e-9 of a cell); row 0 is the top. A series is drawn with `*`, `+`, `x`, `o`, `#` in the order of `--y`; a later series
+overwrites an earlier one in a shared cell.
+
+**The page.** Optional title line (the title centred over the plot area, left padding (W - len) / 2 rounded down, no padding when it is longer than W); then H rows; then the x axis; then the x labels; then the
+legend. A row is the y label of the tick in that row if it has one (right-aligned in a gutter as wide as the longest y label, blank otherwise), a space, `|`, and the W cells. The axis row is the gutter's
+width of spaces, a space, `+` and W `-`. A tick lands in the row (or column) of its value by the rule above, the top and the bottom ones being rows 0 and H-1. The x labels line has each label
+centred on its column (start = column - len / 2 rounded down, from the first cell of the plot area), and a label is dropped if it would touch the previous one (less than one space between) or run
+past the plot area. The legend is one line, `* NAME  + NAME` (two spaces between), the names being the headers. Trailing spaces are removed from every line; each ends with `\n`.
+
+**Gate.** `scripts/check_dumb.py`: an independent implementation in exact fractions renders 200 random charts and 5 hand-drawn ones (written out in the script, drawn by hand from this section), plus the
+refusals and garbage input; mutants of the library must be killed.
