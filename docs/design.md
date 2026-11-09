@@ -272,7 +272,7 @@ They apply to every kind: on a point at the point's x, on a bar at the middle of
 
 **`dumb`.** Let n be the categories and W the width; a category's slot is the columns from s = floor(i W / n) to e = floor((i + 1) W / n), of width sw = e - s. With k series the group is bw = floor((sw - g) / k) columns a
 bar, where g is 1 when sw > k and 0 when sw = k, and starts at s + floor((sw - k bw) / 2). A chart where floor(W / n) < k is refused: `plot.size-invalid`. Bar j of category i fills, in its columns, the rows from the row of its value to the row of 0, both ends
-included (so a bar of height 0 is one row), with the glyph of series j; the rows are those of section 11. Error bars come after all the bars: the `|` glyph in the rows from the row of value + err to the row of value - err, at the column bs + floor(bw / 2) of the bar (bs its first column); for points and lines, at the column of the point. Labels
+included (so a bar of height 0 is one row), with the glyph of series j; the rows are those of section 11. Error bars: the `|` glyph in the rows from the row of value + err to the row of value - err, at the column bs + floor(bw / 2) of the bar (bs its first column), drawn after all the bars, over them; for points and lines at the column of the point, drawn **before** the series, so that the point stays visible (a change made when a real interval plot hid its points: section 24). Labels
 are centred on s + floor(sw / 2), cut and placed as section 11 places the x labels (start = centre - floor(len / 2), clamped to the area). The y axis, the legend and the rest are as before.
 
 **`svg`.** sw = (x1 - x0) / n, the group is 0.8 sw wide and centred, a bar bw = 0.8 sw / k; bar j of category i starts at x0 + i sw + 0.1 sw + j bw (doubles, in this order) and is `<rect x y width height fill="var(--series-J, #HEX)"/>` with y the smaller of
@@ -335,3 +335,21 @@ as the same number, so what is drawn is what the document says.
 
 **Gate.** `cancho test` as before: hand-made documents for each shape (A with nested fields, B, the strings of `ml`, a category), every refusal, the real documents of `stats` and `ml` printed by the tools on a 300-row table (kept as test data and
 compared by hand-derived charts), and the measurement of the mutants of the new code against the tests alone, the rate stated.
+
+## 24. Slice 5b, built [measured]
+
+`--json PATH` (`plot.jsontable`: the document made into the table the other forms read, with the number text copied from the tape, so what is drawn is what the document says), `--ylo` with `--yhi` (the error arrays now hold how far below and above each value:
+`ys` is the k series, then k columns of `down`, then k of `up`), and `--categories` (text on x for points and lines: a point at the middle of its slot, the label under it). The new refusals: `plot.json-invalid`, `plot.json-path`, `plot.json-field`,
+`plot.json-value` (the last two with their row), `plot.usage` for the combinations of `--yerr`, `--ylo` and `--yhi`. **No Python was added**; the gates that exist were not touched.
+
+**What the real tools gave.** `ml importance`, `stats test t2` and `ml cv` were run on a 300-row table and their documents are in `site/data/*.json`; the gallery draws all three straight from them (`--json data.permutation.columns --x column --y importance
+--yerr std`; `--json data.tests --x column --y interval.estimate --ylo interval.low --yhi interval.high --categories`; `--json data.results --x fold --y metrics.roc_auc,metrics.accuracy`). Two things the real documents showed the design had wrong: a forest plot has the *names*
+of the tests on x, so categories could not stay bars-only (`--categories`), and in the text terminal a whisker drawn after the point hid it, so for points and lines the whiskers are now drawn before the series (section 20 says so).
+
+**Tests and measure.** 53 + 21 `cancho test` cases (section 18's way): hand-made documents of every shape and every refusal, the real documents of `ml` and `stats` (the table they become, exactly), intervals by their ends in both terminals with the numbers worked out by hand (the whisker of
+`y = 1` from 0.5 to 1.8 at 177.12 and 356), categories on points, lines and error bars, the limits (5,000 and 5,001 rows; nine-digit indexes). Mutants of the new code against these tests alone: 36; the first tests killed 25, with a test for each survivor 33,
+and the 3 left are equivalent: `c < 32` to `c < 31` in the reader (the JSON reader itself refuses a raw byte 0x1f in a string, which a test checks), `parse(..) <= 0` to `< 0` (parse answers a positive count or a negative error, never 0), and the check for a double quote in a plain
+string, which a plain string cannot hold (the check was removed: dead code). The new flags' *plumbing* in `tools/plot/main.cho` (`--json`, `--ylo`, `--yhi`, `--categories`) is not reachable from a `test_*` function and has no test: it was run by hand on the three real documents (the gallery's commands) and
+by `check_site.py`, which draws them again every time.
+
+**Not yet:** histograms from `stats describe` edges and counts (slice c), `--logy`, horizontal bars, a key with a dot, several documents.

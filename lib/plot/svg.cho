@@ -170,7 +170,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         out = nl(heap, out);
         q = q + 1;
     }
-    if ac[4] == 1 {
+    if ac[4] == 1 || ac[7] == 1 {
         var ci = 0;
         while ci < n {
             out = put(heap, out, "<path d=\"M ");
@@ -183,7 +183,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         }
     }
     q = xk0;
-    if ac[4] == 1 {
+    if ac[4] == 1 || ac[7] == 1 {
         q = xk1 + 1;
     }
     while q <= xk1 {
@@ -223,7 +223,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
     }
     var prev = 0.0;
     var have_prev = false;
-    if ac[4] == 1 {
+    if ac[4] == 1 || ac[7] == 1 {
         var ci = 0;
         while ci < n {
             var ln = cs[2 * ci + 1] - cs[2 * ci];
@@ -247,7 +247,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         }
     }
     q = xk0;
-    if ac[4] == 1 {
+    if ac[4] == 1 || ac[7] == 1 {
         q = xk1 + 1;
     }
     while q <= xk1 {
@@ -385,7 +385,10 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
             out = put(heap, out, "<path d=\"");
             i = 0;
             while i < n {
-                let px = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
+                var px = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
+                if ac[7] == 1 {
+                    px = x0f + (float_of(i) + 0.5) * sws;
+                }
                 let py = y1f + (yhi2 - ys[j * n + i]) / (yhi2 - ylo2) * ph;
                 if lines {
                     if i == 0 {
@@ -429,13 +432,16 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         i = 0;
         while i < n {
             let v = ys[j * n + i];
-            let er = ys[(k + j) * n + i];
+            let down = ys[(k + j) * n + i];
+            let up = ys[(k + ac[5] + j) * n + i];
             var cx = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
             if ac[4] == 1 {
                 cx = x0f + float_of(i) * sws + 0.1 * sws + float_of(j) * bwid + bwid / 2.0;
+            } else if ac[7] == 1 {
+                cx = x0f + (float_of(i) + 0.5) * sws;
             }
-            let yt = y1f + (yhi2 - (v + er)) / (yhi2 - ylo2) * ph;
-            let yb = y1f + (yhi2 - (v - er)) / (yhi2 - ylo2) * ph;
+            let yt = y1f + (yhi2 - (v + up)) / (yhi2 - ylo2) * ph;
+            let yb = y1f + (yhi2 - (v - down)) / (yhi2 - ylo2) * ph;
             if i > 0 {
                 out = put(heap, out, " ");
             }

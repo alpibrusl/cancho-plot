@@ -27,7 +27,7 @@ fn has_control[&t](text: &t [byte]) -> [] bool {
 }
 
 // Read the table in `text` and draw it: x from the column `xspec`, the series from the columns of the comma-separated `yspec`. Answers (code, line, chart): `line` is the line of the table the code is about (from 1).
-pub fn draw[&h, &t, &x, &y, &q, &z, &e, &f](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], yerr: &q [byte], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, svg_term: bool, ann: &e [float], ac: &!f [int]) -> [heap] (int, int, buffer.Buffer) {
+pub fn draw[&h, &t, &x, &y, &q, &q2, &z, &e, &f](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], yerr: &q [byte], yhi: &q2 [byte], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, svg_term: bool, ann: &e [float], ac: &!f [int]) -> [heap] (int, int, buffer.Buffer) {
     let none = buffer.empty(heap, 1);
     if len(text) == 0 {
         return (4, 0, none);
@@ -66,6 +66,24 @@ pub fn draw[&h, &t, &x, &y, &q, &z, &e, &f](heap: &!h Heap, text: &t [byte], xsp
             return (11, 0, none);
         }
     }
+    // the upper ends: --ylo and --yhi go together (ac[6] is 1 for them), one column for each series
+    var kh = 0;
+    if len(yhi) > 0 {
+        kh = 1;
+        var t4 = 0;
+        while t4 < len(yhi) {
+            if int_of(yhi[t4]) == ',' {
+                kh = kh + 1;
+            }
+            t4 = t4 + 1;
+        }
+    }
+    if ac[6] == 1 && kh != ke {
+        return (11, 0, none);
+    }
+    if ac[6] != 1 && kh > 0 {
+        return (11, 0, none);
+    }
     ac[5] = ke;
     var xcol = csv.column(text, 0, hend, xspec);
     var ycols = 0 - 1;
@@ -75,6 +93,7 @@ pub fn draw[&h, &t, &x, &y, &q, &z, &e, &f](heap: &!h Heap, text: &t [byte], xsp
     region r {
         let yc = alloc_slice[r](5, 0);
         let ec = alloc_slice[r](5, 0);
+        let eh = alloc_slice[r](5, 0);
         let ns = alloc_slice[r](5, 0);
         let ne = alloc_slice[r](5, 0);
         var from = 0;
@@ -115,6 +134,22 @@ pub fn draw[&h, &t, &x, &y, &q, &z, &e, &f](heap: &!h Heap, text: &t [byte], xsp
             }
             ep = ep + 1;
         }
+        var hf = 0;
+        var hj = 0;
+        var hp = 0;
+        while hp <= len(yhi) && code == 0 && kh > 0 {
+            if hp == len(yhi) || int_of(yhi[hp]) == ',' {
+                let c = csv.column(text, 0, hend, yhi[hf..hp]);
+                if c < 0 {
+                    code = 5;
+                } else {
+                    eh[hj] = c;
+                    hj = hj + 1;
+                }
+                hf = hp + 1;
+            }
+            hp = hp + 1;
+        }
         if xcol < 0 {
             code = 5;
         }
@@ -134,7 +169,7 @@ pub fn draw[&h, &t, &x, &y, &q, &z, &e, &f](heap: &!h Heap, text: &t [byte], xsp
         if code == 0 {
             let ncols = csv.cells(text, 0, hend);
             let xsb = box_slice(heap, n, 0.0);
-            let ysb = box_slice(heap, n * (ycount + ke), 0.0);
+            let ysb = box_slice(heap, n * (ycount + 2 * ke), 0.0);
             let clb = box_slice(heap, 2 * n, 0);
             borrow mut xsb as &!xw in {
                 borrow mut ysb as &!yw in {
@@ -151,7 +186,7 @@ pub fn draw[&h, &t, &x, &y, &q, &z, &e, &f](heap: &!h Heap, text: &t [byte], xsp
                                 line = row + 2;
                             } else {
                                 let (a, b) = csv.cell(text, at, end, xcol);
-                                if ac[4] == 1 {
+                                if ac[4] == 1 || ac[7] == 1 {
                                     // a category: its label is the cell, its place the row (section 20)
                                     xs[row] = float_of(row);
                                     cl[2 * row] = a;
@@ -187,11 +222,26 @@ pub fn draw[&h, &t, &x, &y, &q, &z, &e, &f](heap: &!h Heap, text: &t [byte], xsp
                                     if !ok3 {
                                         code = 2;
                                         line = row + 2;
+                                    } else if ac[6] == 1 {
+                                        // an interval given by its ends: how far it goes below and above the value
+                                        let (c2, d2) = csv.cell(text, at, end, eh[eq]);
+                                        let (ok4, v4) = num.number(text[c2..d2]);
+                                        if !ok4 {
+                                            code = 2;
+                                            line = row + 2;
+                                        } else if ys[eq * n + row] - v3 < 0.0 || v4 - ys[eq * n + row] < 0.0 {
+                                            code = 7;
+                                            line = row + 2;
+                                        } else {
+                                            ys[(ycount + eq) * n + row] = ys[eq * n + row] - v3;
+                                            ys[(ycount + ke + eq) * n + row] = v4 - ys[eq * n + row];
+                                        }
                                     } else if v3 < 0.0 {
                                         code = 7;
                                         line = row + 2;
                                     } else {
                                         ys[(ycount + eq) * n + row] = v3;
+                                        ys[(ycount + ke + eq) * n + row] = v3;
                                     }
                                     eq = eq + 1;
                                 }

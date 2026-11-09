@@ -404,7 +404,7 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 </figure>
 <figure id="forest">
 <h3>Intervals: an estimate and its half-width, with the zero line</h3>
-<p>Points with <code>--yerr</code> and <code>--hline 0</code>: the shape of the intervals <code>stats test</code> prints (an estimate, and low and high, here as a half-width). The x is the number of the test: names on a point chart wait for categories outside bars.</p>
+<p>Points with <code>--yerr</code> and <code>--hline 0</code>: the shape of the intervals <code>stats test</code> prints (an estimate, and low and high, here as a half-width). <code>--categories</code> puts the names of the tests on x.</p>
 <div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Difference of means, 95% intervals: 1 series, 4 points">
 <g fill="none" stroke="currentColor" stroke-width="1">
 <path d="M 52 36 V 356 H 624"/>
@@ -416,13 +416,10 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 <path d="M 52 127.43 h-4"/>
 <path d="M 52 81.71 h-4"/>
 <path d="M 52 36 h-4"/>
-<path d="M 52 356 v4"/>
-<path d="M 147.33 356 v4"/>
-<path d="M 242.67 356 v4"/>
-<path d="M 338 356 v4"/>
-<path d="M 433.33 356 v4"/>
-<path d="M 528.67 356 v4"/>
-<path d="M 624 356 v4"/>
+<path d="M 123.5 356 v4"/>
+<path d="M 266.5 356 v4"/>
+<path d="M 409.5 356 v4"/>
+<path d="M 552.5 356 v4"/>
 </g>
 <g font-family="sans-serif" font-size="12" fill="currentColor">
 <text x="320" y="20" text-anchor="middle" font-size="14">Difference of means, 95% intervals</text>
@@ -434,22 +431,136 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 <text x="44" y="131.43" text-anchor="end">0.10</text>
 <text x="44" y="85.71" text-anchor="end">0.15</text>
 <text x="44" y="40" text-anchor="end">0.20</text>
-<text x="52" y="374" text-anchor="middle">1.0</text>
-<text x="147.33" y="374" text-anchor="middle">1.5</text>
-<text x="242.67" y="374" text-anchor="middle">2.0</text>
-<text x="338" y="374" text-anchor="middle">2.5</text>
-<text x="433.33" y="374" text-anchor="middle">3.0</text>
-<text x="528.67" y="374" text-anchor="middle">3.5</text>
-<text x="624" y="374" text-anchor="middle">4.0</text>
+<text x="123.5" y="374" text-anchor="middle">x1</text>
+<text x="266.5" y="374" text-anchor="middle">x2</text>
+<text x="409.5" y="374" text-anchor="middle">x3</text>
+<text x="552.5" y="374" text-anchor="middle">x4</text>
 <text x="66" y="392">difference</text>
 </g>
 <path d="M 52 218.86 H 624" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
-<path d="M 52 270.97 h0 M 242.67 207.89 h0 M 433.33 123.77 h0 M 624 238.06 h0" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="4" stroke-linecap="round"/>
-<path d="M 52 214.29 V 327.66 M 49 214.29 h6 M 49 327.66 h6 M 242.67 170.4 V 245.37 M 239.67 170.4 h6 M 239.67 245.37 h6 M 433.33 73.49 V 174.06 M 430.33 73.49 h6 M 430.33 174.06 h6 M 624 210.63 V 265.49 M 621 210.63 h6 M 621 265.49 h6" fill="none" stroke="currentColor" stroke-width="1"/>
+<path d="M 123.5 270.97 h0 M 266.5 207.89 h0 M 409.5 123.77 h0 M 552.5 238.06 h0" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="4" stroke-linecap="round"/>
+<path d="M 123.5 214.29 V 327.66 M 120.5 214.29 h6 M 120.5 327.66 h6 M 266.5 170.4 V 245.37 M 263.5 170.4 h6 M 263.5 245.37 h6 M 409.5 73.49 V 174.06 M 406.5 73.49 h6 M 406.5 174.06 h6 M 552.5 210.63 V 265.49 M 549.5 210.63 h6 M 549.5 265.49 h6" fill="none" stroke="currentColor" stroke-width="1"/>
 <rect x="52" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
 </svg>
 </div>
-<p class="cmd"><code>plot --x test --y difference --yerr half --term svg --title 'Difference of means, 95% intervals' --hline 0 &lt; forest.csv</code> <a href="data/forest.csv">the table</a> <a href="gallery/forest.svg">the svg</a></p>
+<p class="cmd"><code>plot --x test --y difference --yerr half --categories --term svg --title 'Difference of means, 95% intervals' --hline 0 &lt; forest.csv</code> <a href="data/forest.csv">the table</a> <a href="gallery/forest.svg">the svg</a></p>
+</figure>
+<figure id="jsonimp">
+<h3>Straight from ml importance: its JSON, no table in between</h3>
+<p>The document <code>ml importance</code> printed on a 300-row table, read by path: <code>--json data.permutation.columns</code> is the array of objects, <code>--x column --y importance --yerr std</code> pick the fields. The same command works on the output of the tool.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="ml importance (permutation, roc_auc): 1 series, 3 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 134 356 v4"/>
+<path d="M 330 356 v4"/>
+<path d="M 526 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">ml importance (permutation, roc_auc)</text>
+<text x="28" y="360" text-anchor="end">0.0</text>
+<text x="28" y="296" text-anchor="end">0.1</text>
+<text x="28" y="232" text-anchor="end">0.2</text>
+<text x="28" y="168" text-anchor="end">0.3</text>
+<text x="28" y="104" text-anchor="end">0.4</text>
+<text x="28" y="40" text-anchor="end">0.5</text>
+<text x="134" y="374" text-anchor="middle">x1</text>
+<text x="330" y="374" text-anchor="middle">x2</text>
+<text x="526" y="374" text-anchor="middle">g</text>
+<text x="50" y="392">importance</text>
+</g>
+<rect x="55.6" y="105.64" width="156.8" height="250.36" fill="var(--series-1, #0550ae)"/>
+<rect x="251.6" y="333.65" width="156.8" height="22.35" fill="var(--series-1, #0550ae)"/>
+<rect x="447.6" y="353.71" width="156.8" height="2.29" fill="var(--series-1, #0550ae)"/>
+<path d="M 134 89.23 V 122.06 M 131 89.23 h6 M 131 122.06 h6 M 330 331.23 V 336.07 M 327 331.23 h6 M 327 336.07 h6 M 526 353.26 V 354.16 M 523 353.26 h6 M 523 354.16 h6" fill="none" stroke="currentColor" stroke-width="1"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --json data.permutation.columns --x column --y importance --yerr std --with bars --term svg --title 'ml importance (permutation, roc_auc)' &lt; ml-importance.json</code> <a href="data/ml-importance.json">the table</a> <a href="gallery/jsonimp.svg">the svg</a></p>
+</figure>
+<figure id="jsonforest">
+<h3>An interval plot from stats test, asymmetric intervals included</h3>
+<p>The document <code>stats test t2</code> printed: a row for each tested column, the estimate in <code>interval.estimate</code> and the ends of the 95% interval in <code>interval.low</code> and <code>interval.high</code> (<code>--ylo</code>, <code>--yhi</code>); nested fields are dotted paths, <code>--categories</code> puts the column names on x.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="stats test t2: difference of means by group: 1 series, 2 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 52 36 V 356 H 624"/>
+<path d="M 52 356 h-4"/>
+<path d="M 52 276 h-4"/>
+<path d="M 52 196 h-4"/>
+<path d="M 52 116 h-4"/>
+<path d="M 52 36 h-4"/>
+<path d="M 195 356 v4"/>
+<path d="M 481 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">stats test t2: difference of means by group</text>
+<text x="44" y="360" text-anchor="end">-0.15</text>
+<text x="44" y="280" text-anchor="end">-0.10</text>
+<text x="44" y="200" text-anchor="end">-0.05</text>
+<text x="44" y="120" text-anchor="end">0.00</text>
+<text x="44" y="40" text-anchor="end">0.05</text>
+<text x="195" y="374" text-anchor="middle">x1</text>
+<text x="481" y="374" text-anchor="middle">x2</text>
+<text x="66" y="392">interval.estimate</text>
+</g>
+<path d="M 52 116 H 624" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M 195 207.84 h0 M 481 144.51 h0" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="4" stroke-linecap="round"/>
+<path d="M 195 109.39 V 306.29 M 192 109.39 h6 M 192 306.29 h6 M 481 38.21 V 250.81 M 478 38.21 h6 M 478 250.81 h6" fill="none" stroke="currentColor" stroke-width="1"/>
+<rect x="52" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --json data.tests --x column --y interval.estimate --ylo interval.low --yhi interval.high --categories --hline 0 --term svg --title 'stats test t2: difference of means by group' &lt; stats-t2.json</code> <a href="data/stats-t2.json">the table</a> <a href="gallery/jsonforest.svg">the svg</a></p>
+</figure>
+<figure id="jsoncv">
+<h3>Cross-validation folds from ml cv</h3>
+<p>The document <code>ml cv</code> printed, one row for each fold in <code>data.results</code>; two metrics are nested fields (<code>metrics.roc_auc</code>, <code>metrics.accuracy</code>), the fold number is the category.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="ml cv: metrics by fold: 2 series, 4 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 109.5 356 v4"/>
+<path d="M 256.5 356 v4"/>
+<path d="M 403.5 356 v4"/>
+<path d="M 550.5 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">ml cv: metrics by fold</text>
+<text x="28" y="360" text-anchor="end">0.0</text>
+<text x="28" y="296" text-anchor="end">0.2</text>
+<text x="28" y="232" text-anchor="end">0.4</text>
+<text x="28" y="168" text-anchor="end">0.6</text>
+<text x="28" y="104" text-anchor="end">0.8</text>
+<text x="28" y="40" text-anchor="end">1.0</text>
+<text x="109.5" y="374" text-anchor="middle">0</text>
+<text x="256.5" y="374" text-anchor="middle">1</text>
+<text x="403.5" y="374" text-anchor="middle">2</text>
+<text x="550.5" y="374" text-anchor="middle">3</text>
+<text x="50" y="392">metrics.roc_auc</text>
+<text x="200" y="392">metrics.accuracy</text>
+</g>
+<rect x="50.7" y="63.55" width="58.8" height="292.45" fill="var(--series-1, #0550ae)"/>
+<rect x="109.5" y="100" width="58.8" height="256" fill="var(--series-2, #bc4c00)"/>
+<rect x="197.7" y="47.86" width="58.8" height="308.14" fill="var(--series-1, #0550ae)"/>
+<rect x="256.5" y="65.87" width="58.8" height="290.13" fill="var(--series-2, #bc4c00)"/>
+<rect x="344.7" y="52.89" width="58.8" height="303.11" fill="var(--series-1, #0550ae)"/>
+<rect x="403.5" y="82.93" width="58.8" height="273.07" fill="var(--series-2, #bc4c00)"/>
+<rect x="491.7" y="54.69" width="58.8" height="301.31" fill="var(--series-1, #0550ae)"/>
+<rect x="550.5" y="78.67" width="58.8" height="277.33" fill="var(--series-2, #bc4c00)"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+<rect x="186" y="383" width="10" height="10" fill="var(--series-2, #bc4c00)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --json data.results --x fold --y metrics.roc_auc,metrics.accuracy --with bars --term svg --title 'ml cv: metrics by fold' &lt; ml-cv.json</code> <a href="data/ml-cv.json">the table</a> <a href="gallery/jsoncv.svg">the svg</a></p>
 </figure>
 <figure id="barstext">
 <h3>Bars as text</h3>
@@ -535,7 +646,7 @@ $ plot ticks 0 1000000
 </code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Not built yet: histograms, box plots, heatmaps, ROC and other curves, reading the JSON of <code>stats</code> and <code>ml</code> directly, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Not built yet: histograms, box plots, heatmaps, ROC and other curves, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

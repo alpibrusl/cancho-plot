@@ -1,0 +1,203 @@
+edition 9;
+
+module plot.jsontable;
+
+import std.buffer;
+import std.json;
+
+// A JSON document as the table the other forms read (docs/design.md section 23). The codes: 0 done; 12 not JSON; 13 a path that is not there or does not lead to rows; 14 a field that a row lacks (or null);
+// 15 a value that is not a number or a plain string; 6 more than 5,000 rows.
+
+// does the text hold a byte below 0x20 or the byte 0x7f
+fn has_control[&t](text: &t [byte]) -> [] bool {
+    var i = 0;
+    while i < len(text) {
+        let c = int_of(text[i]);
+        if c < 32 || c == 127 {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn has_comma[&t](text: &t [byte]) -> [] bool {
+    var i = 0;
+    while i < len(text) {
+        if int_of(text[i]) == ',' {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// the number a component of a path writes, or -1 when it is not all digits (or is empty or has more than 9)
+fn index_of[&t](part: &t [byte]) -> [] int {
+    if len(part) == 0 || len(part) > 9 {
+        return 0 - 1;
+    }
+    var v = 0;
+    var i = 0;
+    while i < len(part) {
+        let c = int_of(part[i]);
+        if c < '0' || c > '9' {
+            return 0 - 1;
+        }
+        v = v * 10 + (c - '0');
+        i = i + 1;
+    }
+    return v;
+}
+
+// the node that the dotted path leads to from `node`, or -1: a component that is all digits indexes an array, any other names a key of an object ("." is the node itself)
+fn resolve[&s, &t, &p](src: &s [byte], tape: &t [int], node: int, path: &p [byte]) -> [] int {
+    if len(path) == 1 && int_of(path[0]) == '.' {
+        return node;
+    }
+    var cur = node;
+    var start = 0;
+    var i = 0;
+    while i <= len(path) && cur >= 0 {
+        if i == len(path) || int_of(path[i]) == '.' {
+            let part = path[start..i];
+            if len(part) == 0 {
+                return 0 - 1;
+            }
+            let at = index_of(part);
+            if at >= 0 {
+                cur = json.at(tape, cur, at);
+            } else {
+                cur = json.get(src, tape, cur, part);
+            }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return cur;
+}
+
+// the text of the cell the node holds, appended to `out`: (done, out); done is 0, 14 (null) or 15
+fn cell[&h, &s, &t](heap: &!h Heap, out: buffer.Buffer, src: &s [byte], tape: &t [int], node: int) -> [heap] (int, buffer.Buffer) {
+    if node < 0 || json.is_null(tape, node) {
+        return (14, out);
+    }
+    if json.is_number(tape, node) {
+        return (0, buffer.append(heap, out, src[tape[3 * node + 1]..tape[3 * node + 2]]));
+    }
+    if json.is_string(tape, node) && json.string_plain(tape, node) {
+        let text = json.string_view(src, tape, node);
+        // a plain string has no escape, so no quote in it, and the reader refuses control bytes below 0x20 itself: what is left to refuse is 0x7f and the comma
+        if has_control(text) || has_comma(text) {
+            return (15, out);
+        }
+        return (0, buffer.append(heap, out, text));
+    }
+    return (15, out);
+}
+
+// The table of the rows that `path` leads to in `doc`, with the columns `fields` (comma separated): (code, row, csv); `row` is the row (from 1) that code 14 or 15 is about.
+pub fn to_csv[&h, &s, &p, &f](heap: &!h Heap, doc: &s [byte], path: &p [byte], fields: &f [byte]) -> [heap] (int, int, buffer.Buffer) {
+    var out = buffer.empty(heap, 4096);
+    var code = 0;
+    var bad_row = 0;
+    let tb = box_slice(heap, json.tape_len(doc), 0);
+    borrow mut tb as &!tw in {
+        let tape = contents(tw);
+        if json.parse(doc, tape) <= 0 {
+            code = 12;
+        } else {
+            let target = resolve(doc, tape, 0, path);
+            var rows_node = target;
+            var cols_node = 0 - 1;
+            var form_b = false;
+            if target >= 0 && json.is_object(tape, target) {
+                cols_node = json.get(doc, tape, target, "columns");
+                rows_node = json.get(doc, tape, target, "rows");
+                form_b = true;
+                if cols_node < 0 || rows_node < 0 || !json.is_array(tape, cols_node) {
+                    code = 13;
+                }
+            }
+            if code == 0 && (rows_node < 0 || !json.is_array(tape, rows_node)) {
+                code = 13;
+            }
+            if code == 0 {
+                let n = json.count(tape, rows_node);
+                if n == 0 {
+                    code = 13;
+                }
+                if n > 5000 {
+                    code = 6;
+                }
+                // the columns: the header, and for form B where each field is
+                var nf = 1;
+                var i = 0;
+                while i < len(fields) {
+                    if int_of(fields[i]) == ',' {
+                        nf = nf + 1;
+                    }
+                    i = i + 1;
+                }
+                if code == 0 {
+                    out = buffer.append(heap, out, fields);
+                    out = buffer.push(heap, out, byte_of(10));
+                    var r = 0;
+                    while r < n && code == 0 {
+                        let row = json.at(tape, rows_node, r);
+                        var start = 0;
+                        var k = 0;
+                        var p2 = 0;
+                        while p2 <= len(fields) && code == 0 {
+                            if p2 == len(fields) || int_of(fields[p2]) == ',' {
+                                let field = fields[start..p2];
+                                var node = 0 - 1;
+                                if form_b {
+                                    // the position of the column of that name, in the columns array
+                                    var c = 0;
+                                    var found = 0 - 1;
+                                    while c < json.count(tape, cols_node) {
+                                        if json.string_equals(doc, tape, json.at(tape, cols_node, c), field) {
+                                            found = c;
+                                        }
+                                        c = c + 1;
+                                    }
+                                    if found < 0 {
+                                        code = 14;
+                                        bad_row = r + 1;
+                                    } else if json.is_array(tape, row) {
+                                        node = json.at(tape, row, found);
+                                    }
+                                } else if json.is_object(tape, row) {
+                                    node = resolve(doc, tape, row, field);
+                                } else {
+                                    code = 13;
+                                }
+                                if code == 0 {
+                                    let (cc, o2) = cell(heap, out, doc, tape, node);
+                                    out = o2;
+                                    if cc != 0 {
+                                        code = cc;
+                                        bad_row = r + 1;
+                                    }
+                                }
+                                if code == 0 {
+                                    if k + 1 < nf {
+                                        out = buffer.push(heap, out, byte_of(','));
+                                    }
+                                }
+                                k = k + 1;
+                                start = p2 + 1;
+                            }
+                            p2 = p2 + 1;
+                        }
+                        out = buffer.push(heap, out, byte_of(10));
+                        r = r + 1;
+                    }
+                }
+            }
+        }
+    }
+    unbox_slice(heap, tb);
+    return (code, bad_row, out);
+}

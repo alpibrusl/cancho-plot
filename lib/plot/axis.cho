@@ -108,18 +108,19 @@ pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, an
             yhi = 0.0;
         }
     }
-    // error bars: value - err and value + err (the half-lengths follow the k series in ys)
+    // error bars: value - down and value + up (after the k series, ys holds the ke columns of `down` and then the ke of `up`)
     var j = 0;
     while j < ac[5] {
         i = 0;
         while i < n {
             let v = ys[j * n + i];
-            let er = ys[(k + j) * n + i];
-            if v - er < ylo {
-                ylo = v - er;
+            let down = ys[(k + j) * n + i];
+            let up = ys[(k + ac[5] + j) * n + i];
+            if v - down < ylo {
+                ylo = v - down;
             }
-            if v + er > yhi {
-                yhi = v + er;
+            if v + up > yhi {
+                yhi = v + up;
             }
             i = i + 1;
         }

@@ -50,7 +50,7 @@ def datasets():
         five.append("%d,%d,%d,%d,%d,%d" % (x, x, 2 * x - 5, (x * x) // 8, 20 - x, 8 + (3 * x) % 11))
     imp = "feature,importance,std\nx1,0.391,0.026\nx2,0.118,0.019\nx3,0.052,0.011\ng,0.007,0.004\n"
     folds = "fold,roc_auc,accuracy,f1\n1,0.914,0.800,0.810\n2,0.963,0.907,0.921\n3,0.947,0.853,0.874\n4,0.942,0.867,0.872\n"
-    forest = "test,difference,half\n1,-0.057,0.062\n2,0.012,0.041\n3,0.104,0.055\n4,-0.021,0.030\n"
+    forest = "test,difference,half\nx1,-0.057,0.062\nx2,0.012,0.041\nx3,0.104,0.055\nx4,-0.021,0.030\n"
     return {"net.csv": "\n".join(net) + "\n", "calibration.csv": "\n".join(cal) + "\n", "estimate.csv": "\n".join(est) + "\n", "five.csv": "\n".join(five) + "\n", "importance.csv": imp, "folds.csv": folds, "forest.csv": forest}
 
 
@@ -78,8 +78,17 @@ GALLERY = [
      "Several series are grouped side by side in the order of <code>--y</code>: the metrics of each fold of <code>ml cv</code>.",
      "folds.csv", ["--x", "fold", "--y", "roc_auc,accuracy,f1", "--with", "bars", "--term", "svg", "--title", "Cross-validation by fold"], "svg"),
     ("forest", "Intervals: an estimate and its half-width, with the zero line",
-     "Points with <code>--yerr</code> and <code>--hline 0</code>: the shape of the intervals <code>stats test</code> prints (an estimate, and low and high, here as a half-width). The x is the number of the test: names on a point chart wait for categories outside bars.",
-     "forest.csv", ["--x", "test", "--y", "difference", "--yerr", "half", "--term", "svg", "--title", "Difference of means, 95% intervals", "--hline", "0"], "svg"),
+     "Points with <code>--yerr</code> and <code>--hline 0</code>: the shape of the intervals <code>stats test</code> prints (an estimate, and low and high, here as a half-width). <code>--categories</code> puts the names of the tests on x.",
+     "forest.csv", ["--x", "test", "--y", "difference", "--yerr", "half", "--categories", "--term", "svg", "--title", "Difference of means, 95% intervals", "--hline", "0"], "svg"),
+    ("jsonimp", "Straight from ml importance: its JSON, no table in between",
+     "The document <code>ml importance</code> printed on a 300-row table, read by path: <code>--json data.permutation.columns</code> is the array of objects, <code>--x column --y importance --yerr std</code> pick the fields. The same command works on the output of the tool.",
+     "ml-importance.json", ["--json", "data.permutation.columns", "--x", "column", "--y", "importance", "--yerr", "std", "--with", "bars", "--term", "svg", "--title", "ml importance (permutation, roc_auc)"], "svg"),
+    ("jsonforest", "An interval plot from stats test, asymmetric intervals included",
+     "The document <code>stats test t2</code> printed: a row for each tested column, the estimate in <code>interval.estimate</code> and the ends of the 95% interval in <code>interval.low</code> and <code>interval.high</code> (<code>--ylo</code>, <code>--yhi</code>); nested fields are dotted paths, <code>--categories</code> puts the column names on x.",
+     "stats-t2.json", ["--json", "data.tests", "--x", "column", "--y", "interval.estimate", "--ylo", "interval.low", "--yhi", "interval.high", "--categories", "--hline", "0", "--term", "svg", "--title", "stats test t2: difference of means by group"], "svg"),
+    ("jsoncv", "Cross-validation folds from ml cv",
+     "The document <code>ml cv</code> printed, one row for each fold in <code>data.results</code>; two metrics are nested fields (<code>metrics.roc_auc</code>, <code>metrics.accuracy</code>), the fold number is the category.",
+     "ml-cv.json", ["--json", "data.results", "--x", "fold", "--y", "metrics.roc_auc,metrics.accuracy", "--with", "bars", "--term", "svg", "--title", "ml cv: metrics by fold"], "svg"),
     ("barstext", "Bars as text",
      "The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.",
      "importance.csv", ["--x", "feature", "--y", "importance", "--with", "bars", "--yerr", "std", "--term", "dumb", "--size", "56x12"], "txt"),
@@ -108,7 +117,8 @@ def build(out):
     for name, text in datasets().items():
         open(os.path.join(out, "data", name), "w").write(text)
     if os.path.abspath(out) != os.path.abspath(SITE):
-        shutil.copy(os.path.join(SITE, "data", "holdout.csv"), os.path.join(out, "data", "holdout.csv"))
+        for kept in ("holdout.csv", "ml-importance.json", "stats-t2.json", "ml-cv.json"):      # real data, not made here
+            shutil.copy(os.path.join(SITE, "data", kept), os.path.join(out, "data", kept))
     cards = []
     for gid, title, text, data, args, kind in GALLERY:
         table = open(os.path.join(out, "data", data), "rb").read()
@@ -193,7 +203,7 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 <pre><code>@TICKS@</code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Not built yet: histograms, box plots, heatmaps, ROC and other curves, reading the JSON of <code>stats</code> and <code>ml</code> directly, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Not built yet: histograms, box plots, heatmaps, ROC and other curves, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

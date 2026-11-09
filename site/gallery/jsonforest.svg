@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="stats test t2: difference of means by group: 1 series, 2 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 52 36 V 356 H 624"/>
+<path d="M 52 356 h-4"/>
+<path d="M 52 276 h-4"/>
+<path d="M 52 196 h-4"/>
+<path d="M 52 116 h-4"/>
+<path d="M 52 36 h-4"/>
+<path d="M 195 356 v4"/>
+<path d="M 481 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">stats test t2: difference of means by group</text>
+<text x="44" y="360" text-anchor="end">-0.15</text>
+<text x="44" y="280" text-anchor="end">-0.10</text>
+<text x="44" y="200" text-anchor="end">-0.05</text>
+<text x="44" y="120" text-anchor="end">0.00</text>
+<text x="44" y="40" text-anchor="end">0.05</text>
+<text x="195" y="374" text-anchor="middle">x1</text>
+<text x="481" y="374" text-anchor="middle">x2</text>
+<text x="66" y="392">interval.estimate</text>
+</g>
+<path d="M 52 116 H 624" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M 195 207.84 h0 M 481 144.51 h0" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="4" stroke-linecap="round"/>
+<path d="M 195 109.39 V 306.29 M 192 109.39 h6 M 192 306.29 h6 M 481 38.21 V 250.81 M 478 38.21 h6 M 478 250.81 h6" fill="none" stroke="currentColor" stroke-width="1"/>
+<rect x="52" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
