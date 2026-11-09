@@ -1,0 +1,132 @@
+edition 9;
+
+module plot.ticks;
+
+import std.buffer;
+
+// Nice ticks (docs/design.md section 5). A step is `m * 10^e` with m one of 1, 2, 5; the ticks are the integer multiples of it inside the range, so a tick is the integer `k * m` and the
+// exponent `e`, and its text is made from those two integers alone, with no float formatting: the labels are exact and the same on every platform.
+
+// 10^k for k from 0 to 22, exactly (every power up to 10^22 is a float)
+pub fn pow10(k: int) -> [] float {
+    var p = 1.0;
+    var i = 0;
+    while i < k && i < 22 {
+        p = p * 10.0;
+        i = i + 1;
+    }
+    return p;
+}
+
+// x / 10^e, the one rounding being the division's
+fn over(x: float, e: int) -> [] float {
+    if e >= 0 {
+        return x / pow10(e);
+    }
+    return x * pow10(0 - e);
+}
+
+// the step for a range of `span` (more than 0) aimed at `n` intervals: (m, e) with m in 1, 2, 5. The raw step span / n is written f * 10^e with f in [1, 10); f up to 1.5 gives 1, up to 3 gives 2, up to 7
+// gives 5, and the rest 10 (which is 1 of the next power). A tie goes to the smaller step, with a tolerance of 1e-9 so that 0.9 / 6 (which is not quite 0.15 in a float) is a tie like 1.5 is.
+pub fn step(span: float, n: int) -> [] (int, int) {
+    let raw = span / float_of(n);
+    var e = 0;
+    var f = raw;
+    while f >= 10.0 && e < 300 {
+        f = f / 10.0;
+        e = e + 1;
+    }
+    while f < 1.0 && e > 0 - 300 {
+        f = f * 10.0;
+        e = e - 1;
+    }
+    if f < 1.5 + 1.0e-9 {
+        return (1, e);
+    }
+    if f < 3.0 + 1.0e-9 {
+        return (2, e);
+    }
+    if f < 7.0 + 1.0e-9 {
+        return (5, e);
+    }
+    return (1, e + 1);
+}
+
+// the multiples of the step m*10^e that lie in [lo, hi] (widened by 1e-9 of a step at each end): (first, last) as integers k, the tick being k * m * 10^e. (first > last when there are none)
+pub fn range(lo: float, hi: float, m: int, e: int) -> [] (int, int) {
+    let unit = float_of(m);
+    let a = over(lo, e) / unit;
+    let b = over(hi, e) / unit;
+    // the range is widened by 1e-9 of a step at each end, so that 0.29 * 100 = 28.999999999999996 still reaches the tick 29
+    let ca = a - 1.0e-9;
+    let cb = b + 1.0e-9;
+    var first = truncate(ca);
+    if float_of(first) < ca {
+        first = first + 1;
+    }
+    var last = truncate(cb);
+    if float_of(last) > cb {
+        last = last - 1;
+    }
+    return (first, last);
+}
+
+// the tick k * m * 10^e as text appended to `out`: an integer when e >= 0, else with -e digits after the point
+pub fn label[&h](heap: &!h Heap, out: buffer.Buffer, k: int, m: int, e: int) -> [heap] buffer.Buffer {
+    var b = out;
+    var n = k * m;
+    if n < 0 {
+        b = buffer.push(heap, b, byte_of('-'));
+        n = 0 - n;
+    }
+    if e >= 0 {
+        b = buffer.push_nat(heap, b, n);
+        if n != 0 {
+            var z = 0;
+            while z < e {
+                b = buffer.push(heap, b, byte_of('0'));
+                z = z + 1;
+            }
+        }
+        return b;
+    }
+    let d = 0 - e;
+    // n has `digits` digits; the point goes d from the right, with zeros in front when it has d or fewer
+    var digits = 1;
+    var t = n;
+    while t >= 10 {
+        t = t / 10;
+        digits = digits + 1;
+    }
+    if digits <= d {
+        b = buffer.push(heap, b, byte_of('0'));
+        b = buffer.push(heap, b, byte_of('.'));
+        var z = 0;
+        while z < d - digits {
+            b = buffer.push(heap, b, byte_of('0'));
+            z = z + 1;
+        }
+        b = buffer.push_nat(heap, b, n);
+        return b;
+    }
+    var scale = 1;
+    var i = 0;
+    while i < d {
+        scale = scale * 10;
+        i = i + 1;
+    }
+    b = buffer.push_nat(heap, b, n / scale);
+    b = buffer.push(heap, b, byte_of('.'));
+    let frac = n - (n / scale) * scale;
+    var z = 0;
+    var pad = scale / 10;
+    while pad > frac && pad > 1 {
+        b = buffer.push(heap, b, byte_of('0'));
+        pad = pad / 10;
+        z = z + 1;
+    }
+    if frac > 0 || d > 0 {
+        b = buffer.push_nat(heap, b, frac);
+    }
+    return b;
+}

@@ -1,6 +1,6 @@
 # cancho-plot: design
 
-Written 2026-11-09, before any code (`CLAUDE.md`). Every claim is **[measured]** with its command, a **[choice]**, or **[open]**. Nothing is built.
+Written 2026-11-09, before any code (`CLAUDE.md`). Every claim is **[measured]** with its command, a **[choice]**, or **[open]**. Slice 1 (ticks) is built: section 10.
 
 ## 1. Why
 
@@ -58,3 +58,20 @@ in `metasearch-bidding`.
 ## 9. Open
 
 Whether to install gnuplot and compare; the exact gnuplot subset; float formatting (section 2); the palette; whether `plot` should also read `stats`' JSON (intervals) directly.
+
+## 10. Slice 1: `plot ticks LO HI [N]`, built [measured]
+
+**The rule.** The raw step is (HI - LO) / N, written f * 10^e with f in [1, 10). f up to 1.5 gives a step of 1 * 10^e, up to 3 gives 2, up to 7 gives 5, and above that 1 * 10^(e+1); a tie
+goes to the smaller step (a tolerance of 1e-9 makes 0.9 / 6 a tie). The ticks are the multiples of the step inside [LO, HI], the range being widened by 1e-9 of a step at each end. A tick
+is the integer k * m and the exponent e, and its text is made from those two integers, never from a float: the labels are exact and fixed in length (`0.0 0.2 0.4`, not `0 0.2 0.4`).
+This is a **[choice]** of the usual 1-2-5 rule, not gnuplot's own (section 2).
+
+**The guard.** Tick numbers are integers and powers of ten up to 10^22 are exact floats, so a range is refused (`plot.range-invalid`) unless it lies within 1e15 of zero, is at least 1e-12
+wide, and is no more than 1e12 times narrower than its distance from zero. The garbage-argument gate found this: `ticks -1e300 -1` ended in a trap (`truncate` of a float beyond an int).
+
+**The gate** (`scripts/check_ticks.py`, `PLOT=build/plot`): 15 hand-checked cases, 600 random ranges against an independent implementation in exact fractions, 17 refusals each with its
+rule tag, 200 garbage argument lists that must end in 0 or 2, and `--mutants` (needs `CANCHO`): 15 mutants of the library, all killed; three more are equivalent and are listed in the
+script with the reason. **A bug the first version had, found by the gate** once the tolerance mutants were added: the tolerance guarded only one side, so `ticks 0.24 0.29 5` lost
+the tick 0.29 (0.29 * 100 is 28.999999999999996 in a float); both ends are widened now, and the two cases are in the table.
+
+**Not yet:** `--term dumb`, the SVG, the other kinds, the script form, the data input.

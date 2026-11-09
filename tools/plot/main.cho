@@ -1,0 +1,103 @@
+edition 9;
+
+// `plot` -- plots as a command line (docs/design.md). Built so far:
+//
+//     plot ticks LO HI [N]     the nice ticks of the range [LO, HI] aimed at N intervals (default 5), one label a line
+//
+// A refusal prints nothing on standard output and, on standard error, one JSON line `{"error":"plot.<rule>","message":"...","repair":"..."}`; exit status 2.
+// Authority: arguments, standard output and standard error; no file, no network, no clock.
+
+import plot.num;
+import plot.ticks;
+import std.buffer;
+import std.bytes;
+import std.io;
+
+fn refuse[&i](io: &!i Io, rule: &static [byte], message: &static [byte], repair: &static [byte]) -> [err_write] int {
+    let a = io.error_all(io, "{\"error\":\"");
+    let b = io.error_all(io, rule);
+    let c = io.error_all(io, "\",\"message\":\"");
+    let d = io.error_all(io, message);
+    let e = io.error_all(io, "\",\"repair\":\"");
+    let f = io.error_all(io, repair);
+    let g = io.error_all(io, "\"}\n");
+    return 2;
+}
+
+fn do_ticks[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_write, err_write, args] int {
+    if arg_count(args) < 4 || arg_count(args) > 5 {
+        return refuse(io, "plot.usage", "ticks takes LO HI and optionally N", "plot ticks 0 10 5");
+    }
+    let (lo_ok, lo) = num.number(arg(args, 2));
+    let (hi_ok, hi) = num.number(arg(args, 3));
+    if !lo_ok || !hi_ok {
+        return refuse(io, "plot.not-numeric", "LO and HI must be numbers", "write them as decimals: 0 or -2.5 or 1e3");
+    }
+    var n = 5;
+    if arg_count(args) == 5 {
+        n = num.natural(arg(args, 4));
+        if n < 1 || n > 100 {
+            return refuse(io, "plot.range-invalid", "N must be a whole number from 1 to 100", "plot ticks 0 10 5");
+        }
+    }
+    if !(lo < hi) {
+        return refuse(io, "plot.range-invalid", "LO must be less than HI", "swap them, or widen the range");
+    }
+    // what the ticks can stand for: tick numbers are integers and powers of ten up to 10^22 are exact (docs/design.md section 5)
+    let span = hi - lo;
+    var far = hi;
+    if 0.0 - lo > far {
+        far = 0.0 - lo;
+    }
+    if far > 1.0e15 || span < 1.0e-12 || far / span > 1.0e12 {
+        return refuse(io, "plot.range-invalid", "the range must lie within 1e15 of zero, be at least 1e-12 wide, and be no more than 1e12 times narrower than its distance from zero", "plot the difference from a base value, or rescale the data");
+    }
+    let (m, e) = ticks.step(span, n);
+    let (first, last) = ticks.range(lo, hi, m, e);
+    var out = buffer.empty(heap, 256);
+    var k = first;
+    while k <= last {
+        out = ticks.label(heap, out, k, m, e);
+        out = buffer.push(heap, out, byte_of(10));
+        k = k + 1;
+    }
+    borrow out as &ob in {
+        let w = buffer.write(io, ob);
+    }
+    buffer.drop(heap, out);
+    return 0;
+}
+
+fn run[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_write, err_write, args] int {
+    if arg_count(args) < 2 {
+        return refuse(io, "plot.usage", "a verb is needed", "plot ticks 0 10 5");
+    }
+    let verb = arg(args, 1);
+    if bytes.equal(verb, "ticks") {
+        return do_ticks(heap, io, args);
+    }
+    return refuse(io, "plot.usage", "unknown verb", "the verbs built so far: ticks");
+}
+
+fn main(world: World) -> [] int {
+    let Split { io, ffi, fs, heap, args, net, clock, signals, exec, tty } = split(world);
+    release(ffi);
+    release(net);
+    release(clock);
+    release(signals);
+    release(exec);
+    release(tty);
+    var status = 0;
+    borrow mut heap as &!h in {
+        borrow args as &g in {
+            borrow mut io as &!i in {
+                status = run(h, i, g);
+            }
+        }
+    }
+    release(heap);
+    release(fs);
+    release(args);
+    release(io);
+    return status;
+}
