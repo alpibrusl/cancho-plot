@@ -1,0 +1,418 @@
+edition 9;
+
+module plot.dumb;
+
+import plot.csv;
+import plot.num;
+import plot.ticks;
+import std.buffer;
+
+// The text terminal (docs/design.md section 11): a CSV table in memory in, a chart of characters out. The codes `draw` answers with: 0 done; 1 a double quote; 2 a cell that is not a number; 3 a line with
+// the wrong number of cells; 4 no rows; 5 a column that is not there; 6 more than 5,000 rows; 7 a range the ticks cannot stand for; 8 more than 5 series (the caller maps them to rule tags).
+
+fn clamp(c: int, size: int) -> [] int {
+    if c < 0 {
+        return 0;
+    }
+    if c > size - 1 {
+        return size - 1;
+    }
+    return c;
+}
+
+// floor((v - lo) * size / (hi - lo)), clamped to the last cell, with 1e-9 of a cell of slack
+fn colcell(v: float, lo: float, hi: float, size: int) -> [] int {
+    return clamp(truncate((v - lo) * float_of(size) / (hi - lo) + 1.0e-9), size);
+}
+
+// floor((hi - v) * size / (hi - lo)), clamped: row 0 is the top
+fn rowcell(v: float, lo: float, hi: float, size: int) -> [] int {
+    return clamp(truncate((hi - v) * float_of(size) / (hi - lo) + 1.0e-9), size);
+}
+
+// the number of bytes in a buffer
+fn used[&h](b: buffer.Buffer) -> [] (buffer.Buffer, int) {
+    var n = 0;
+    borrow b as &q in {
+        n = buffer.size(q);
+    }
+    return (b, n);
+}
+
+fn spaces[&h](heap: &!h Heap, b: buffer.Buffer, n: int) -> [heap] buffer.Buffer {
+    var out = b;
+    var i = 0;
+    while i < n {
+        out = buffer.push(heap, out, byte_of(' '));
+        i = i + 1;
+    }
+    return out;
+}
+
+// the line, without its trailing spaces, and a newline, appended to `out`
+fn flush[&h](heap: &!h Heap, out: buffer.Buffer, line: buffer.Buffer) -> [heap] buffer.Buffer {
+    var o = out;
+    borrow line as &lb in {
+        let bs = buffer.bytes(lb);
+        var n = len(bs);
+        while n > 0 && int_of(bs[n - 1]) == ' ' {
+            n = n - 1;
+        }
+        o = buffer.append(heap, o, bs[0..n]);
+    }
+    buffer.drop(heap, line);
+    return buffer.push(heap, o, byte_of(10));
+}
+
+// the range of the values widened by 1 each way when it is a point, and whether the ticks can stand for it (section 10): (lo, hi, ok)
+fn fix(lo0: float, hi0: float) -> [] (float, float, bool) {
+    var lo = lo0;
+    var hi = hi0;
+    if lo == hi {
+        lo = lo - 1.0;
+        hi = hi + 1.0;
+    }
+    var far = hi;
+    if 0.0 - lo > far {
+        far = 0.0 - lo;
+    }
+    let span = hi - lo;
+    if far > 1.0e15 || span < 1.0e-12 || far / span > 1.0e12 {
+        return (lo, hi, false);
+    }
+    return (lo, hi, true);
+}
+
+// the widened range and its ticks: (lo, hi, m, e, first, last)
+fn axis(lo: float, hi: float, n: int) -> [] (float, float, int, int, int, int) {
+    let (m, e) = ticks.step(hi - lo, n);
+    let (k0, k1) = ticks.enclose(lo, hi, m, e);
+    return (ticks.value(k0, m, e), ticks.value(k1, m, e), m, e, k0, k1);
+}
+
+// The chart of the `n` points of `xs` and the `k` series of `ys` (series j is ys[j*n..j*n+n]), `w` by `h` characters; the names of the series are text[ns[j]..ne[j]].
+fn render[&h, &t, &a, &b, &c, &d, &z](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool) -> [heap] buffer.Buffer {
+    var xlo = xs[0];
+    var xhi = xs[0];
+    var ylo = ys[0];
+    var yhi = ys[0];
+    var i = 0;
+    while i < n {
+        if xs[i] < xlo {
+            xlo = xs[i];
+        }
+        if xs[i] > xhi {
+            xhi = xs[i];
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < k * n {
+        if ys[i] < ylo {
+            ylo = ys[i];
+        }
+        if ys[i] > yhi {
+            yhi = ys[i];
+        }
+        i = i + 1;
+    }
+    let (xl0, xh0, xok) = fix(xlo, xhi);
+    let (yl0, yh0, yok) = fix(ylo, yhi);
+    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis(xl0, xh0, 6);
+    let (ylo2, yhi2, ym, ye, yk0, yk1) = axis(yl0, yh0, 5);
+    var out = buffer.empty(heap, 4096);
+    region r {
+        let grid = alloc_slice[r](w * hh, byte_of(' '));
+        let glyphs = "*+xo#";
+        var j = 0;
+        while j < k {
+            i = 0;
+            while i < n {
+                let col = colcell(xs[i], xlo2, xhi2, w);
+                let row = rowcell(ys[j * n + i], ylo2, yhi2, hh);
+                grid[row * w + col] = glyphs[j];
+                i = i + 1;
+            }
+            j = j + 1;
+        }
+        // the labels of the y axis
+        let nt = yk1 - yk0 + 1;
+        let yoff = alloc_slice[r](nt + 1, 0);
+        let yrow = alloc_slice[r](nt, 0);
+        var yl = buffer.empty(heap, 128);
+        var g = 0;
+        var t = 0;
+        while t < nt {
+            let (yl1, before) = used(yl);
+            yoff[t] = before;
+            let yl2 = ticks.label(heap, yl1, yk0 + t, ym, ye);
+            let (yl3, after) = used(yl2);
+            yl = yl3;
+            yrow[t] = rowcell(ticks.value(yk0 + t, ym, ye), ylo2, yhi2, hh);
+            t = t + 1;
+        }
+        let (yl4, total) = used(yl);
+        yl = yl4;
+        yoff[nt] = total;
+        // the gutter is as wide as the longest label that is drawn: when two ticks fall in one row the higher one is drawn
+        t = 0;
+        while t < nt {
+            var shown = true;
+            var t2 = t + 1;
+            while t2 < nt {
+                if yrow[t2] == yrow[t] {
+                    shown = false;
+                }
+                t2 = t2 + 1;
+            }
+            if shown && yoff[t + 1] - yoff[t] > g {
+                g = yoff[t + 1] - yoff[t];
+            }
+            t = t + 1;
+        }
+        borrow yl as &ylb in {
+            let lab = buffer.bytes(ylb);
+            if has_title {
+                var line = spaces(heap, buffer.empty(heap, 64), g + 2);
+                var pad = (w - len(title)) / 2;
+                if pad < 0 {
+                    pad = 0;
+                }
+                line = spaces(heap, line, pad);
+                line = buffer.append(heap, line, title);
+                out = flush(heap, out, line);
+            }
+            var row = 0;
+            while row < hh {
+                var line = buffer.empty(heap, 64);
+                var which = 0 - 1;
+                t = 0;
+                while t < nt {
+                    if yrow[t] == row {
+                        which = t;
+                    }
+                    t = t + 1;
+                }
+                var lw = 0;
+                if which >= 0 {
+                    lw = yoff[which + 1] - yoff[which];
+                }
+                line = spaces(heap, line, g - lw);
+                if which >= 0 {
+                    line = buffer.append(heap, line, lab[yoff[which]..yoff[which + 1]]);
+                }
+                line = buffer.push(heap, line, byte_of(' '));
+                line = buffer.push(heap, line, byte_of('|'));
+                line = buffer.append(heap, line, grid[row * w..row * w + w]);
+                out = flush(heap, out, line);
+                row = row + 1;
+            }
+        }
+        buffer.drop(heap, yl);
+        // the x axis
+        var line = spaces(heap, buffer.empty(heap, 64), g);
+        line = buffer.push(heap, line, byte_of(' '));
+        line = buffer.push(heap, line, byte_of('+'));
+        var d = 0;
+        while d < w {
+            line = buffer.push(heap, line, byte_of('-'));
+            d = d + 1;
+        }
+        out = flush(heap, out, line);
+        // the labels of the x axis
+        let xl = alloc_slice[r](w, byte_of(' '));
+        var prev_end = 0 - 2;
+        var q = xk0;
+        while q <= xk1 {
+            let (lb, ln) = used(ticks.label(heap, buffer.empty(heap, 16), q, xm, xe));
+            let col = colcell(ticks.value(q, xm, xe), xlo2, xhi2, w);
+            var start = col - ln / 2;
+            if start > w - ln {
+                start = w - ln;
+            }
+            if start < 0 {
+                start = 0;
+            }
+            if ln <= w && start >= prev_end + 1 {
+                borrow lb as &lbb in {
+                    let bs = buffer.bytes(lbb);
+                    var u = 0;
+                    while u < ln {
+                        xl[start + u] = bs[u];
+                        u = u + 1;
+                    }
+                }
+                prev_end = start + ln;
+            }
+            buffer.drop(heap, lb);
+            q = q + 1;
+        }
+        line = spaces(heap, buffer.empty(heap, 64), g + 2);
+        line = buffer.append(heap, line, xl[0..w]);
+        out = flush(heap, out, line);
+        // the legend
+        line = buffer.empty(heap, 64);
+        j = 0;
+        while j < k {
+            if j > 0 {
+                line = buffer.append(heap, line, "  ");
+            }
+            line = buffer.push(heap, line, glyphs[j]);
+            line = buffer.push(heap, line, byte_of(' '));
+            line = buffer.append(heap, line, text[ns[j]..ne[j]]);
+            j = j + 1;
+        }
+        out = flush(heap, out, line);
+    }
+    return out;
+}
+
+// Read the table in `text` and draw it: x from the column `xspec`, the series from the columns of the comma-separated `yspec`. Answers (code, line, chart): `line` is the line of the table the code is about (from 1).
+pub fn draw[&h, &t, &x, &y, &z](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], w: int, hh: int, title: &z [byte], has_title: bool) -> [heap] (int, int, buffer.Buffer) {
+    let none = buffer.empty(heap, 1);
+    if len(text) == 0 {
+        return (4, 0, none);
+    }
+    if csv.has_quote(text) {
+        return (1, 0, none);
+    }
+    let hend = csv.line_end(text, 0);
+    // the series asked for
+    var ycount = 1;
+    var s = 0;
+    while s < len(yspec) {
+        if int_of(yspec[s]) == ',' {
+            ycount = ycount + 1;
+        }
+        s = s + 1;
+    }
+    if ycount > 5 {
+        return (8, 0, none);
+    }
+    var xcol = csv.column(text, 0, hend, xspec);
+    var ycols = 0 - 1;
+    var code = 0;
+    var line = 0;
+    var out = none;
+    region r {
+        let yc = alloc_slice[r](5, 0);
+        let ns = alloc_slice[r](5, 0);
+        let ne = alloc_slice[r](5, 0);
+        var from = 0;
+        var j = 0;
+        var p = 0;
+        while p <= len(yspec) && code == 0 {
+            if p == len(yspec) || int_of(yspec[p]) == ',' {
+                let c = csv.column(text, 0, hend, yspec[from..p]);
+                if c < 0 {
+                    code = 5;
+                } else {
+                    yc[j] = c;
+                    let (a, b) = csv.cell(text, 0, hend, c);
+                    ns[j] = a;
+                    ne[j] = b;
+                    j = j + 1;
+                }
+                from = p + 1;
+            }
+            p = p + 1;
+        }
+        if xcol < 0 {
+            code = 5;
+        }
+        // the rows
+        var n = 0;
+        var at = csv.next_line(text, hend);
+        while at < len(text) {
+            n = n + 1;
+            at = csv.next_line(text, csv.line_end(text, at));
+        }
+        if code == 0 && n == 0 {
+            code = 4;
+        }
+        if code == 0 && n > 5000 {
+            code = 6;
+        }
+        if code == 0 {
+            let ncols = csv.cells(text, 0, hend);
+            let xsb = box_slice(heap, n, 0.0);
+            let ysb = box_slice(heap, n * ycount, 0.0);
+            borrow mut xsb as &!xw in {
+                borrow mut ysb as &!yw in {
+                    let xs = contents(xw);
+                    let ys = contents(yw);
+                    var row = 0;
+                    at = csv.next_line(text, hend);
+                    while row < n && code == 0 {
+                        let end = csv.line_end(text, at);
+                        if csv.cells(text, at, end) != ncols {
+                            code = 3;
+                            line = row + 2;
+                        } else {
+                            let (a, b) = csv.cell(text, at, end, xcol);
+                            let (ok, v) = num.number(text[a..b]);
+                            if !ok {
+                                code = 2;
+                                line = row + 2;
+                            } else {
+                                xs[row] = v;
+                            }
+                            var q = 0;
+                            while q < ycount && code == 0 {
+                                let (c, d) = csv.cell(text, at, end, yc[q]);
+                                let (ok2, v2) = num.number(text[c..d]);
+                                if !ok2 {
+                                    code = 2;
+                                    line = row + 2;
+                                } else {
+                                    ys[q * n + row] = v2;
+                                }
+                                q = q + 1;
+                            }
+                        }
+                        at = csv.next_line(text, end);
+                        row = row + 1;
+                    }
+                    if code == 0 {
+                        var xlo = xs[0];
+                        var xhi = xs[0];
+                        var ylo = ys[0];
+                        var yhi = ys[0];
+                        var i = 0;
+                        while i < n {
+                            if xs[i] < xlo {
+                                xlo = xs[i];
+                            }
+                            if xs[i] > xhi {
+                                xhi = xs[i];
+                            }
+                            i = i + 1;
+                        }
+                        i = 0;
+                        while i < n * ycount {
+                            if ys[i] < ylo {
+                                ylo = ys[i];
+                            }
+                            if ys[i] > yhi {
+                                yhi = ys[i];
+                            }
+                            i = i + 1;
+                        }
+                        let (a, b, xok) = fix(xlo, xhi);
+                        let (c, d, yok) = fix(ylo, yhi);
+                        if !xok || !yok {
+                            code = 7;
+                        } else {
+                            buffer.drop(heap, out);
+                            out = render(heap, text, xs, ys, n, ycount, ns, ne, w, hh, title, has_title);
+                        }
+                    }
+
+                }
+            }
+            unbox_slice(heap, ysb);
+            unbox_slice(heap, xsb);
+        }
+    }
+    return (code, line, out);
+}

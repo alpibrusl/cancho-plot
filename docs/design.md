@@ -94,10 +94,23 @@ row floor((yhi - y) * H / (yhi - ylo)), both clamped to the last cell (tolerance
 overwrites an earlier one in a shared cell.
 
 **The page.** Optional title line (the title centred over the plot area, left padding (W - len) / 2 rounded down, no padding when it is longer than W); then H rows; then the x axis; then the x labels; then the
-legend. A row is the y label of the tick in that row if it has one (right-aligned in a gutter as wide as the longest y label, blank otherwise), a space, `|`, and the W cells. The axis row is the gutter's
+legend. A row is the y label of the tick in that row if it has one (right-aligned in a gutter as wide as the longest label that is drawn, blank otherwise; when two ticks fall in one row, which happens at small heights, the higher one is drawn), a space, `|`, and the W cells. The axis row is the gutter's
 width of spaces, a space, `+` and W `-`. A tick lands in the row (or column) of its value by the rule above, the top and the bottom ones being rows 0 and H-1. The x labels line has each label
-centred on its column (start = column - len / 2 rounded down, from the first cell of the plot area), and a label is dropped if it would touch the previous one (less than one space between) or run
-past the plot area. The legend is one line, `* NAME  + NAME` (two spaces between), the names being the headers. Trailing spaces are removed from every line; each ends with `\n`.
+centred on its column (start = column - len / 2 rounded down, from the first cell of the plot area), and a label is dropped if it would touch the previous one (less than one space between). The start is clamped to the plot area: from 0 to W minus the length. The legend is one line, `* NAME  + NAME` (two spaces between), the names being the headers. Trailing spaces are removed from every line; each ends with `\n`.
 
-**Gate.** `scripts/check_dumb.py`: an independent implementation in exact fractions renders 200 random charts and 5 hand-drawn ones (written out in the script, drawn by hand from this section), plus the
+**Gate.** `scripts/check_dumb.py`: an independent implementation in exact fractions renders 200 random charts and 3 hand-drawn ones (written out in the script, drawn by hand from this section), plus the
 refusals and garbage input; mutants of the library must be killed.
+
+## 12. Slice 2, built [measured]
+
+`plot --x COL --y COL[,COL..] [--size WxH] [--title TEXT] [--term dumb] < table.csv` draws the chart of section 11. `scripts/check_dumb.py` (`PLOT=build/plot`): 3 hand-drawn charts, 200 random charts
+(1 to 5 series, `\n` and `\r\n`, columns by name and by number, titles from blank to 200 bytes) against an independent implementation in exact fractions, 4 rounding traps (0.29 * 100 is
+28.999999999999996 and 0.07 * 100 is 7.000000000000001 in a float), 26 refusals each with its rule tag, the line number that `plot.not-numeric` and `plot.csv-shape` carry, 5,000 rows accepted,
+200 garbage tables that must end in 0 or 2; `--mutants` (needs `CANCHO`): 40 mutants, all killed; one more is equivalent and is explained in the script.
+
+**What building it found.** (1) Standard input is read with `read_bytes` into a buffer, but the arrays of the points must be on the heap (`box_slice`): a region is one 64 KiB chunk and 5,000 rows of
+six series do not fit (the first run trapped, "region chunk exhausted"). (2) The gutter was first sized from every tick, including ones dropped when two ticks fall in one row, and the independent
+implementation drew it from the drawn ones: the text of section 11 now says "drawn", and the program does. (3) The first set of mutants left twelve alive: the gate had no table with CRLF line endings, none with
+five series, none that named a column by its number, no value that a float multiplies to just above or below a whole number, and nothing that read the line number in a refusal. Each of those is a case now.
+
+**Not yet:** lines, bars, the histogram; `--term svg`; the script form; `--x` as an index when it is omitted.

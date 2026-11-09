@@ -10,12 +10,13 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 plot -c script.plot < data.csv                                       # a small gnuplot-like script: set, plot ... using 1:3 with lines
 ```
 
-**Status.** `plot ticks LO HI [N]` is built and gated (`docs/design.md` section 10); the rest is design: `docs/design.md`.
+**Status.** `plot ticks LO HI [N]` (section 10) and the text chart of points from CSV (`plot --x COL --y COL --term dumb`, section 12) are built and gated; the rest is design: `docs/design.md`.
 
 ```
-cancho build lib/plot/num.cho lib/plot/ticks.cho tools/plot/main.cho --std -o build/plot      # or: cancho build --bin plot
+cancho build lib/plot/num.cho lib/plot/ticks.cho lib/plot/csv.cho lib/plot/dumb.cho tools/plot/main.cho --std -o build/plot      # or: cancho build --bin plot
 PLOT=build/plot python3 scripts/check_ticks.py [--mutants]                                      # --mutants needs CANCHO=the compiler
+PLOT=build/plot python3 scripts/check_dumb.py [--mutants]
 ```
 
- Authority (planned): standard input and output, nothing else; no file, no network, no clock. Licence EUPL-1.2,
+ Authority: arguments, standard input, standard output and standard error, nothing else; no file, no network, no clock. Licence EUPL-1.2,
 copyright Alpibru S.L.

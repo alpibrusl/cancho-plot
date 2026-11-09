@@ -1,0 +1,103 @@
+edition 9;
+
+module plot.csv;
+
+import plot.num;
+
+// Reading a CSV table held in memory (docs/design.md section 11). Positions, not slices: a function returns where a cell is, and the caller cuts the text.
+
+// is there a double quote anywhere (quoted cells are not read)
+pub fn has_quote[&t](text: &t [byte]) -> [] bool {
+    var i = 0;
+    while i < len(text) {
+        if int_of(text[i]) == '"' {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// where the line that starts at `from` ends: the position of its newline, or len(text); `\r` before the newline is not part of the line
+pub fn line_end[&t](text: &t [byte], from: int) -> [] int {
+    var i = from;
+    while i < len(text) && int_of(text[i]) != 10 {
+        i = i + 1;
+    }
+    if i > from && int_of(text[i - 1]) == 13 {
+        return i - 1;
+    }
+    return i;
+}
+
+// where the next line starts, given that the line starting at `from` ends at `end`
+pub fn next_line[&t](text: &t [byte], end: int) -> [] int {
+    var i = end;
+    while i < len(text) && int_of(text[i]) != 10 {
+        i = i + 1;
+    }
+    return i + 1;
+}
+
+// how many cells the line text[from..end] has
+pub fn cells[&t](text: &t [byte], from: int, end: int) -> [] int {
+    var n = 1;
+    var i = from;
+    while i < end {
+        if int_of(text[i]) == ',' {
+            n = n + 1;
+        }
+        i = i + 1;
+    }
+    return n;
+}
+
+// where cell number `k` (from 0) of the line text[from..end] is: (start, stop); (-1, -1) when the line has no such cell
+pub fn cell[&t](text: &t [byte], from: int, end: int, k: int) -> [] (int, int) {
+    var start = from;
+    var n = 0;
+    var i = from;
+    while i <= end {
+        if i == end || int_of(text[i]) == ',' {
+            if n == k {
+                return (start, i);
+            }
+            n = n + 1;
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return (0 - 1, 0 - 1);
+}
+
+fn same[&t, &s](text: &t [byte], a: int, b: int, name: &s [byte]) -> [] bool {
+    if b - a != len(name) {
+        return false;
+    }
+    var i = 0;
+    while i < len(name) {
+        if text[a + i] != name[i] {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+// the column that `spec` names in the header text[from..end]: the first cell with exactly that text, else the number (from 1) it writes; -1 when there is none
+pub fn column[&t, &s](text: &t [byte], from: int, end: int, spec: &s [byte]) -> [] int {
+    let n = cells(text, from, end);
+    var k = 0;
+    while k < n {
+        let (a, b) = cell(text, from, end, k);
+        if same(text, a, b, spec) {
+            return k;
+        }
+        k = k + 1;
+    }
+    let v = num.natural(spec);
+    if v >= 1 && v <= n {
+        return v - 1;
+    }
+    return 0 - 1;
+}

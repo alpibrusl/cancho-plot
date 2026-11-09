@@ -128,6 +128,7 @@ def dec(x):
     return label(n, -d) if d else str(n)
 
 
+SRCS = ["lib/plot/num.cho", "lib/plot/ticks.cho", "lib/plot/csv.cho", "lib/plot/dumb.cho", "tools/plot/main.cho"]
 MUTANTS = [
     ("lib/plot/ticks.cho", "if f < 1.5 + 1.0e-9 {", "if f < 1.4 + 1.0e-9 {"),
     ("lib/plot/ticks.cho", "if f < 1.5 + 1.0e-9 {", "if f < 1.5 {"),
@@ -156,7 +157,7 @@ def mutants():
     killed = survivors = 0
     for path, old, new in MUTANTS:
         with tempfile.TemporaryDirectory() as d:
-            for f in ("lib/plot/num.cho", "lib/plot/ticks.cho", "tools/plot/main.cho"):
+            for f in SRCS:
                 src = open(os.path.join(ROOT, f)).read()
                 if f == path:
                     assert old in src, "mutant text not found: %s" % old
@@ -164,7 +165,7 @@ def mutants():
                 os.makedirs(os.path.join(d, os.path.dirname(f)), exist_ok=True)
                 open(os.path.join(d, f), "w").write(src)
             exe = os.path.join(d, "plot")
-            p = subprocess.run([cancho, "build", d + "/lib/plot/num.cho", d + "/lib/plot/ticks.cho", d + "/tools/plot/main.cho", "--std", "-o", exe], capture_output=True)
+            p = subprocess.run([cancho, "build"] + [d + "/" + f for f in SRCS] + ["--std", "-o", exe], capture_output=True)
             if p.returncode != 0:
                 print("mutant did not build (rewrite it): %s -> %s\n%s" % (old, new, p.stderr.decode()[:200]))
                 sys.exit(1)

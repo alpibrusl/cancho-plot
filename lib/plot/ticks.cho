@@ -130,3 +130,28 @@ pub fn label[&h](heap: &!h Heap, out: buffer.Buffer, k: int, m: int, e: int) -> 
     }
     return b;
 }
+
+// the tick k * m * 10^e as a float, with the one rounding of a division by a power of ten (0.3 and not 3 * 0.1)
+pub fn value(k: int, m: int, e: int) -> [] float {
+    let n = float_of(k * m);
+    if e >= 0 {
+        return n * pow10(e);
+    }
+    return n / pow10(0 - e);
+}
+
+// the multiples of the step m*10^e that enclose [lo, hi]: (first, last), first * step <= lo and last * step >= hi, with 1e-9 of a step of slack at each end
+pub fn enclose(lo: float, hi: float, m: int, e: int) -> [] (int, int) {
+    let unit = float_of(m);
+    let a = over(lo, e) / unit + 1.0e-9;
+    let b = over(hi, e) / unit - 1.0e-9;
+    var first = truncate(a);
+    if float_of(first) > a {
+        first = first - 1;
+    }
+    var last = truncate(b);
+    if float_of(last) < b {
+        last = last + 1;
+    }
+    return (first, last);
+}

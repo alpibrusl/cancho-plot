@@ -4,6 +4,6 @@ cancho = "695e8f9ef8f1fda9d9489a72858a55cdfe86bc86"   # the compiler at the time
 
 [[bin]]
 name = "plot"
-sources = ["lib/plot", "tools/plot"]
+sources = ["lib/plot", "tools/plot"]   # lib/plot/{num,ticks,csv,dumb}.cho, tools/plot/main.cho
 std = true
 out = "build/plot"
