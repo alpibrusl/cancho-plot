@@ -225,3 +225,36 @@ from a `test_*` function; the Python gates are what covers them.
 
 **What this does not replace.** The random charts (600 ranges, 200 charts per terminal, compared with the oracle in exact fractions), the XML check, the refusals through the binary with their exit status, the garbage
 tables, and the landing page's freshness. Those stay in the Python scripts, which are not ported and not extended.
+
+## 19. Plots for cancho-stats and cancho-ml [design, measured shapes; nothing built]
+
+**What the two tools print, measured** (2026-11-10, `stats` 0.1.0 and `ml` 0.1.0, a 300-row table of two features, a group and a 0/1 target, and the 302-day series of the gallery). Both print one JSON document
+(`stats.v1`, `ml.v1`: `ok`, `command`, `schema`, `data`, `meta`); `ml` writes every decimal as a string with its digits exact, `stats` writes JSON numbers.
+
+| command | what it prints that can be drawn | chart |
+|---|---|---|
+| `stats describe --bins N [--by COL]` | per column `histogram {bins, edges[N+1], counts[N]}`, `quantiles [{p, value}]`, `min`, `max`, `mean`, `sd` | histogram; box plot (min, quartiles, max); one of each per group |
+| `stats test t2/t1/paired/prop ...` | per test `interval {estimate, low, high, level}`, `p_value`, `effect_size {name, value}` | interval (forest) plot: one row per test, a dot and a bar; the zero line |
+| `stats corr` | `pairs [{x, y, r, p_value}]` | matrix of `r` (heatmap), or bars of `r` |
+| `ml eval` | `metrics {accuracy, precision, recall, f1, roc_auc, log_loss}` (strings) | bars of metrics |
+| `ml cv` | `results [{repeat, fold, train, test, metrics{..}}]` | metric by fold: points with the mean as a line; box over folds |
+| `ml importance` | `importance.columns [{column, importance, rank}]` and `permutation.columns [{column, importance, std, rank}]` | horizontal bars, with `std` as error bars |
+| `ml calibrate` | calibration bins (to be read: `--prob-bins`) | reliability diagram: observed against predicted, the diagonal |
+| `ml predict --proba` | `data.rows [[label, probability]]`, `columns` | ROC and precision-recall curves, a histogram of the probabilities, once `plot` computes them |
+| `ml runs compare/list` | tracked runs and their metrics | bars; points over runs |
+
+**What `plot` lacks for them**, in the order of how many of the charts need it:
+1. **Bars** (`--with bars`): a category on x (the cell's text, not a number), one bar a category, grouped for several series, from a baseline that includes 0; also horizontal (`--horizontal`) for long names.
+2. **Intervals / error bars**: `--yerr COL` (symmetric) or `--ylo COL --yhi COL`, drawn on points, lines and bars. The forest plot is points with intervals and a `--vline 0`.
+3. **A histogram** from edges and counts (steps, bars on a numeric x), and from raw values (`--hist COL --bins N`, with the bins `stats` would choose, so the two agree).
+4. **JSON input.** `plot --json PATH...` reads the documents above: a path to an array of objects (`data.columns.0.histogram`, `data.tests`, `data.importance.columns`), and the columns to use as `--x`/`--y`. Strings holding decimals (`ml`) are numbers here. A pipe `stats ... | plot ...` is then the whole interface.
+5. **Heatmap** (`--with heat`: x, y, value; a cell a rectangle, the value a colour ramp, the value written when it fits) for correlations and confusion matrices.
+6. **Box plot** (`--with box`: five numbers a row, whiskers, optional points).
+7. **Curves computed by plot**: ROC and precision-recall from a label and a score column (sorting, exact integer counts, the area as a check against `roc_auc`), the empirical CDF and a Q-Q plot from one column. These are statistics, so each has to be measured against `ml`'s and `stats`' own numbers (the ROC area against `roc_auc`).
+8. **`--by COL`** (a series for each value of a column), which the report already needed.
+
+**Constraints that carry over.** Same rules as sections 1 to 18: a refusal is a rule tag; the same table gives the same bytes; both terminals draw every kind; **no Python**: the tests are `cancho test` cases (expected text derived by hand from the layout rules, or from the tool's own printed numbers) plus the binary's own refusals, and
+each new kind gets a mutant check by the same throwaway measurement as section 18, a kill rate stated as measured. The first gate for ROC is `ml eval`'s `roc_auc` to every digit it prints.
+
+**Order proposed.** (a) bars with categories, grouped, both terminals, and error bars on them (items 1 and 2: this alone draws feature importance, metrics, folds and the forest plot); (b) JSON input for `stats describe` histograms and `ml` documents (items 4 and 3 from edges);
+(c) heatmap and box (5, 6); (d) the curves (7) and `--by` (8). Each is a section here before its code, as the others were.
