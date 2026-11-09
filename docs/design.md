@@ -114,3 +114,32 @@ implementation drew it from the drawn ones: the text of section 11 now says "dra
 five series, none that named a column by its number, no value that a float multiplies to just above or below a whole number, and nothing that read the line number in a refusal. Each of those is a case now.
 
 **Not yet:** lines, bars, the histogram; `--term svg`; the script form; `--x` as an index when it is omitted.
+
+## 13. Slice 3: lines for both terminals, and `--term svg` [choice, before the code]
+
+    plot --x COL --y COL[,COL..] [--with points|lines] [--term dumb|svg] [--size WxH] [--title TEXT] < table.csv
+
+`--with` defaults to `points`. `--size` is characters for `dumb` (default 60x20, section 11) and pixels for `svg` (default 640x400, W from 100 to 2000, H from 100 to 1200). Bytes below 0x20 or
+0x7f in the title or in the header cells that name a series are refused with `plot.text-invalid` (a terminal and an XML file are both hurt by them).
+
+**Lines in `dumb`.** Consecutive points of a series, in the order of the table, are joined in cell space. From cell (c0, r0) to (c1, r1), with dc = c1 - c0, dr = r1 - r0 and n = max(|dc|, |dr|), the
+cells are, for i from 0 to n, (c0 + sign(dc) * ((2 |dc| i + n) div 2n), r0 + sign(dr) * ((2 |dr| i + n) div 2n)): integers only, `div` the floor of non-negative integers, so a half goes up. n = 0 is the
+one cell. Series are drawn in order and a later glyph overwrites an earlier one, as for points.
+
+**`svg`: the layout** (every number in user units = pixels). g is the length of the longest y tick label (all ticks, here nothing collides). left = 12 + 8 g, right = 16, top = 36 with a title and 12
+without, bottom = 44. x0 = left, x1 = W - 16, y1 = top, y2 = H - 44; the plot area must be at least 20 wide and 20 high (`plot.size-invalid` otherwise). The ranges and ticks are those of section 11. In
+doubles, in this order: X(x) = x0 + (x - xlo) / (xhi - xlo) * (x1 - x0) and Y(y) = y1 + (yhi - y) / (yhi - ylo) * (y2 - y1), with xlo, xhi, ylo, yhi the widened axis ends (the correctly rounded value
+of the tick, section 10).
+
+**`svg`: the text.** One element a line, in this order: the root `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" width="W" height="H" role="img" aria-label="L">` where L is
+the escaped title and `: ` if there is one, then `K series, N points` (`1 series` for one); the axes group `<g fill="none" stroke="currentColor" stroke-width="1">` with the path
+`M x0 y1 V y2 H x1`, one path `M x0 Y h-4` for each y tick and `M X y2 v4` for each x tick; the text group `<g font-family="sans-serif" font-size="12" fill="currentColor">` with the title
+(`<text x="W/2" y="20" text-anchor="middle" font-size="14">`), the y labels (`x="x0 - 8" y="Y + 4" text-anchor="end"`), the x labels (`x="X" y="y2 + 18" text-anchor="middle"`; a label is
+left out when X is less than 8 (len + 1) pixels after the previous one drawn, len being its length), and the legend names (`x="x0 + 150 j + 14" y="H - 8"`); then for each series a path with
+`fill="none" stroke="var(--series-J, #HEX)"`, J from 1 and HEX one of `0550ae`, `bc4c00`, `1a7f37`, `8250df`, `cf222e`: for lines `d="M X Y L X Y .."` with `stroke-width="1.5" stroke-linecap="round"` (one
+point is `M X Y h0`), for points `d="M X Y h0 M X Y h0 .."` with `stroke-width="4" stroke-linecap="round"`; then the legend swatches `<rect x="x0 + 150 j" y="H - 17" width="10" height="10" fill=".."/>`; then
+`</svg>`. A number is written with 2 decimals, correctly rounded from the double (a tie goes to the even digit), trailing zeros and a bare point dropped, `-0` written `0`. Text is escaped (`&`, `<`,
+`>`, `"` as `&amp;`, `&lt;`, `&gt;`, `&quot;`). No clock, no id, no random: the same table and flags give the same bytes.
+
+**Gate.** `scripts/check_dumb.py` gains `--with lines`; `scripts/check_svg.py` renders with an independent implementation (Python floats in the order above, ticks from fractions) 200 random charts and
+hand-checked fragments, and the refusals; mutants of the sources must be killed. The SVG is also well-formed XML (`xml.dom.minidom` in the gate, not in the tool).
