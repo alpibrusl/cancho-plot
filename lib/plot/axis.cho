@@ -42,3 +42,62 @@ pub fn axis(lo: float, hi: float, n: int) -> [] (float, float, int, int, int, in
     return (ticks.value(k0, m, e), ticks.value(k1, m, e), m, e, k0, k1);
 }
 
+// The ranges of a chart: the points, and the annotations (docs/design.md section 15). `ann` holds the --vline values at 0, the --hline values at 8 and the band ends (lo, hi) at 16; `ac` holds how many of
+// each there are (vlines, hlines, bands) and whether the diagonal is asked for. Answers (xlo, xhi, ylo, yhi).
+pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, ann: &c [float], ac: &d [int]) -> [] (float, float, float, float) {
+    var xlo = xs[0];
+    var xhi = xs[0];
+    var ylo = ys[0];
+    var yhi = ys[0];
+    var i = 0;
+    while i < n {
+        if xs[i] < xlo {
+            xlo = xs[i];
+        }
+        if xs[i] > xhi {
+            xhi = xs[i];
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < k * n {
+        if ys[i] < ylo {
+            ylo = ys[i];
+        }
+        if ys[i] > yhi {
+            yhi = ys[i];
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < ac[0] {
+        if ann[i] < xlo {
+            xlo = ann[i];
+        }
+        if ann[i] > xhi {
+            xhi = ann[i];
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < ac[1] {
+        if ann[8 + i] < ylo {
+            ylo = ann[8 + i];
+        }
+        if ann[8 + i] > yhi {
+            yhi = ann[8 + i];
+        }
+        i = i + 1;
+    }
+    i = 0;
+    while i < 2 * ac[2] {
+        if ann[16 + i] < ylo {
+            ylo = ann[16 + i];
+        }
+        if ann[16 + i] > yhi {
+            yhi = ann[16 + i];
+        }
+        i = i + 1;
+    }
+    return (xlo, xhi, ylo, yhi);
+}

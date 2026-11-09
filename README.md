@@ -10,13 +10,15 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 plot -c script.plot < data.csv                                       # a small gnuplot-like script: set, plot ... using 1:3 with lines
 ```
 
-**Status.** `plot ticks LO HI [N]` (section 10) and charts from CSV on standard input, as points or lines, as text (`--term dumb`, sections 11 and 12) or as SVG (`--term svg`, sections 13 and 14), are built and gated; the rest is design: `docs/design.md`.
+**Status.** `plot ticks LO HI [N]` (section 10) and charts from CSV on standard input, as points or lines, as text (`--term dumb`, sections 11 and 12) or as SVG (`--term svg`, sections 13 and 14), with markers (`--vline`, `--hline`), bands (`--band`) and the diagonal (`--diag`), are built and gated; the rest is design: `docs/design.md`. The landing page, with a gallery of what the binary writes, is `site/index.html` (`python3 -m http.server --directory site`).
 
 ```
 cancho build lib/plot/*.cho tools/plot/main.cho --std -o build/plot      # or: cancho build --bin plot
 PLOT=build/plot python3 scripts/check_ticks.py [--mutants]                                      # --mutants needs CANCHO=the compiler
 PLOT=build/plot python3 scripts/check_dumb.py [--mutants]
 PLOT=build/plot python3 scripts/check_svg.py [--mutants]
+PLOT=build/plot python3 scripts/check_site.py                                                   # the landing page is what the binary writes now
+CANCHO=... [MUTANTS=1] scripts/check.sh                                                       # all of it
 ```
 
  Authority: arguments, standard input, standard output and standard error, nothing else; no file, no network, no clock. Licence EUPL-1.2,

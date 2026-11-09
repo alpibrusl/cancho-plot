@@ -89,31 +89,9 @@ fn stroke[&h](heap: &!h Heap, b: buffer.Buffer, j: int) -> [heap] buffer.Buffer 
 }
 
 // Answers (code, document): code 0, or 9 when the plot area would be under 20 wide or high.
-pub fn render[&h, &t, &a, &b, &c, &d, &z](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool) -> [heap] (int, buffer.Buffer) {
-    var xlo = xs[0];
-    var xhi = xs[0];
-    var ylo = ys[0];
-    var yhi = ys[0];
+pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, ann: &e [float], ac: &f [int]) -> [heap] (int, buffer.Buffer) {
+    let (xlo, xhi, ylo, yhi) = axis.extent(xs, ys, n, k, ann, ac);
     var i = 0;
-    while i < n {
-        if xs[i] < xlo {
-            xlo = xs[i];
-        }
-        if xs[i] > xhi {
-            xhi = xs[i];
-        }
-        i = i + 1;
-    }
-    i = 0;
-    while i < k * n {
-        if ys[i] < ylo {
-            ylo = ys[i];
-        }
-        if ys[i] > yhi {
-            yhi = ys[i];
-        }
-        i = i + 1;
-    }
     let (xl0, xh0, xok) = axis.fix(xlo, xhi);
     let (yl0, yh0, yok) = axis.fix(ylo, yhi);
     let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6);
@@ -259,6 +237,69 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z](heap: &!h Heap, text: &t [byte], xs: &
     }
     out = put(heap, out, "</g>");
     out = nl(heap, out);
+    // the annotations, under the series (section 15)
+    var u = 0;
+    while u < ac[2] {
+        let ytop = y1f + (yhi2 - ann[17 + 2 * u]) / (yhi2 - ylo2) * ph;
+        let ybot = y1f + (yhi2 - ann[16 + 2 * u]) / (yhi2 - ylo2) * ph;
+        out = put(heap, out, "<rect x=\"");
+        out = numi(heap, out, x0);
+        out = put(heap, out, "\" y=\"");
+        out = num(heap, out, ytop);
+        out = put(heap, out, "\" width=\"");
+        out = numi(heap, out, x1 - x0);
+        out = put(heap, out, "\" height=\"");
+        out = num(heap, out, ybot - ytop);
+        out = put(heap, out, "\" fill=\"var(--band, currentColor)\" fill-opacity=\"0.12\"/>");
+        out = nl(heap, out);
+        u = u + 1;
+    }
+    u = 0;
+    while u < ac[1] {
+        let yy = y1f + (yhi2 - ann[8 + u]) / (yhi2 - ylo2) * ph;
+        out = put(heap, out, "<path d=\"M ");
+        out = numi(heap, out, x0);
+        out = put(heap, out, " ");
+        out = num(heap, out, yy);
+        out = put(heap, out, " H ");
+        out = numi(heap, out, x1);
+        out = put(heap, out, "\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"4 3\"/>");
+        out = nl(heap, out);
+        u = u + 1;
+    }
+    u = 0;
+    while u < ac[0] {
+        let xx = x0f + (ann[u] - xlo2) / (xhi2 - xlo2) * pw;
+        out = put(heap, out, "<path d=\"M ");
+        out = num(heap, out, xx);
+        out = put(heap, out, " ");
+        out = numi(heap, out, y1);
+        out = put(heap, out, " V ");
+        out = numi(heap, out, y2);
+        out = put(heap, out, "\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"4 3\"/>");
+        out = nl(heap, out);
+        u = u + 1;
+    }
+    var t0 = xlo2;
+    if ylo2 > t0 {
+        t0 = ylo2;
+    }
+    var t1 = xhi2;
+    if yhi2 < t1 {
+        t1 = yhi2;
+    }
+    if ac[3] == 1 && t0 < t1 {
+        out = put(heap, out, "<path d=\"M ");
+        out = num(heap, out, x0f + (t0 - xlo2) / (xhi2 - xlo2) * pw);
+        out = put(heap, out, " ");
+        out = num(heap, out, y1f + (yhi2 - t0) / (yhi2 - ylo2) * ph);
+        out = put(heap, out, " L ");
+        out = num(heap, out, x0f + (t1 - xlo2) / (xhi2 - xlo2) * pw);
+        out = put(heap, out, " ");
+        out = num(heap, out, y1f + (yhi2 - t1) / (yhi2 - ylo2) * ph);
+        out = put(heap, out, "\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"1 3\"/>");
+        out = nl(heap, out);
+    }
     j = 0;
     while j < k {
         out = put(heap, out, "<path d=\"");

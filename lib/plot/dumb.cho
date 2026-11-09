@@ -54,31 +54,9 @@ fn flush[&h](heap: &!h Heap, out: buffer.Buffer, line: buffer.Buffer) -> [heap] 
 }
 
 // The chart of the `n` points of `xs` and the `k` series of `ys` (series j is ys[j*n..j*n+n]), `w` by `h` characters; the names of the series are text[ns[j]..ne[j]].
-pub fn render[&h, &t, &a, &b, &c, &d, &z](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool) -> [heap] buffer.Buffer {
-    var xlo = xs[0];
-    var xhi = xs[0];
-    var ylo = ys[0];
-    var yhi = ys[0];
+pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, ann: &e [float], ac: &f [int]) -> [heap] buffer.Buffer {
+    let (xlo, xhi, ylo, yhi) = axis.extent(xs, ys, n, k, ann, ac);
     var i = 0;
-    while i < n {
-        if xs[i] < xlo {
-            xlo = xs[i];
-        }
-        if xs[i] > xhi {
-            xhi = xs[i];
-        }
-        i = i + 1;
-    }
-    i = 0;
-    while i < k * n {
-        if ys[i] < ylo {
-            ylo = ys[i];
-        }
-        if ys[i] > yhi {
-            yhi = ys[i];
-        }
-        i = i + 1;
-    }
     let (xl0, xh0, xok) = axis.fix(xlo, xhi);
     let (yl0, yh0, yok) = axis.fix(ylo, yhi);
     let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6);
@@ -87,6 +65,73 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z](heap: &!h Heap, text: &t [byte], xs: &
     region r {
         let grid = alloc_slice[r](w * hh, byte_of(' '));
         let glyphs = "*+xo#";
+        // the annotations, under the series (section 15): bands, then horizontal lines, then vertical ones, then the diagonal
+        var u = 0;
+        while u < ac[2] {
+            var rr = rowcell(ann[17 + 2 * u], ylo2, yhi2, hh);
+            let last = rowcell(ann[16 + 2 * u], ylo2, yhi2, hh);
+            while rr <= last {
+                var cc = 0;
+                while cc < w {
+                    grid[rr * w + cc] = byte_of(':');
+                    cc = cc + 1;
+                }
+                rr = rr + 1;
+            }
+            u = u + 1;
+        }
+        u = 0;
+        while u < ac[1] {
+            let rr = rowcell(ann[8 + u], ylo2, yhi2, hh);
+            var cc = 0;
+            while cc < w {
+                grid[rr * w + cc] = byte_of('-');
+                cc = cc + 1;
+            }
+            u = u + 1;
+        }
+        u = 0;
+        while u < ac[0] {
+            let cc = colcell(ann[u], xlo2, xhi2, w);
+            var rr = 0;
+            while rr < hh {
+                grid[rr * w + cc] = byte_of('|');
+                rr = rr + 1;
+            }
+            u = u + 1;
+        }
+        var t0 = xlo2;
+        if ylo2 > t0 {
+            t0 = ylo2;
+        }
+        var t1 = xhi2;
+        if yhi2 < t1 {
+            t1 = yhi2;
+        }
+        if ac[3] == 1 && t0 < t1 {
+            let c0 = colcell(t0, xlo2, xhi2, w);
+            let r0 = rowcell(t0, ylo2, yhi2, hh);
+            let c1 = colcell(t1, xlo2, xhi2, w);
+            let r1 = rowcell(t1, ylo2, yhi2, hh);
+            // t0 < t1, so the diagonal goes right and up: the column grows and the row falls
+            let dc = c1 - c0;
+            let dr = r0 - r1;
+            var m = dc;
+            if dr > m {
+                m = dr;
+            }
+            var step = 0;
+            while step <= m {
+                var cc = c0;
+                var rr = r0;
+                if m > 0 {
+                    cc = c0 + (2 * dc * step + m) / (2 * m);
+                    rr = r0 - (2 * dr * step + m) / (2 * m);
+                }
+                grid[rr * w + cc] = byte_of('/');
+                step = step + 1;
+            }
+        }
         var j = 0;
         while j < k {
             i = 0;
@@ -257,5 +302,3 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z](heap: &!h Heap, text: &t [byte], xs: &
     }
     return out;
 }
-
-

@@ -184,7 +184,26 @@ section 13.
 
 ## 16. The landing page [choice]
 
-`site/index.html`, one static file with no script: what `plot` is, the three outputs (text, SVG, ticks), a gallery, and the gates. The gallery's charts are real output of the binary, made by
-`scripts/gallery.sh`-style steps (no, by `scripts/make_gallery.py`, which runs `build/plot` on the tables in `site/data/` and writes `site/gallery/*.svg` and `*.txt`), and the page embeds those files
+`site/index.html`, one static file with no script: what `plot` is, the three outputs (text, SVG, ticks), a gallery, and the gates. The gallery's charts are real output of the binary: `scripts/make_gallery.py` runs `build/plot` on the tables in `site/data/` and writes `site/gallery/*.svg` and `*.txt`, and the page embeds those files
 inline, so the page shows exactly what the tool wrote. `scripts/check_site.py` checks that every gallery file is what the binary writes now (so the page cannot go stale), that the page is well-formed XML
 and has no external reference, and that every command it shows is one of the commands that produced a file.
+
+## 17. Slices 4 and 16, built [measured]
+
+**Markers, bands, the diagonal** (section 15) in both terminals, through `axis.extent` (the one place that widens the ranges). The oracles draw them in half of the 200 random charts of each gate (up to 8
+verticals, 8 horizontals, 4 bands, the diagonal), one hand-drawn chart pins their cells, the refusals are 45 for `dumb` and 14 for `svg`. Mutants: `check_dumb.py` 73 killed, `check_svg.py` 58 killed,
+0 survived; equivalent ones are listed in the scripts with their reason (`c != 2` to `c < 2` in `--band`, and a leftward step of the diagonal that the code does not have: its columns only grow).
+**What the mutants found.** Two ranges that only touch (x in [0, 2], y in [2, 4]) make a diagonal of no length: `t0 <= t1` and `t0 < t1` looked the same until that chart was in both gates. A branch of the
+diagonal for a leftward step could never run (the survivor that showed it), so it is not there.
+
+**The landing page** (section 16): `site/index.html` and `site/gallery/`, made by `scripts/make_gallery.py` from the binary, checked by `scripts/check_site.py` (the page and gallery made again must be the
+committed ones, byte for byte; well-formed XML; no script, link, image, `src` or `url()`; links only to this repository and to files that exist; the command shown under each chart is the one that made it).
+The check was seen to fail twice while it was written: a gallery file that no longer matched the binary, and a page that did not embed a gallery file. The page uses `<!DOCTYPE html>` in capitals
+because the check parses it as XML. The data are made with integers only (a linear congruential generator), so they are the same on every machine; one chart is a real series, 302 days of a holdout's
+margin from `metasearch-bidding`. To serve it: `python3 -m http.server --directory site`.
+
+`scripts/check.sh` runs all of it: build, `cancho fmt --check`, the 2,000-line limit, the four checks, and with `MUTANTS=1` the mutants. The one known gap in the gallery is the palette's contrast, not
+measured (section 14).
+
+**Not yet:** bars, the histogram, error bars, series from a column of categories (`--by`), the script form. `--by` would be the next thing a report asks for: its tables are long (a row per day and arm), and
+`plot` only reads wide ones (a column per series, one x for all).

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Net margin per hotel-day: 2 series, 60 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 310.29 h-4"/>
+<path d="M 36 264.57 h-4"/>
+<path d="M 36 218.86 h-4"/>
+<path d="M 36 173.14 h-4"/>
+<path d="M 36 127.43 h-4"/>
+<path d="M 36 81.71 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 36 356 v4"/>
+<path d="M 134 356 v4"/>
+<path d="M 232 356 v4"/>
+<path d="M 330 356 v4"/>
+<path d="M 428 356 v4"/>
+<path d="M 526 356 v4"/>
+<path d="M 624 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Net margin per hotel-day</text>
+<text x="28" y="360" text-anchor="end">80</text>
+<text x="28" y="314.29" text-anchor="end">100</text>
+<text x="28" y="268.57" text-anchor="end">120</text>
+<text x="28" y="222.86" text-anchor="end">140</text>
+<text x="28" y="177.14" text-anchor="end">160</text>
+<text x="28" y="131.43" text-anchor="end">180</text>
+<text x="28" y="85.71" text-anchor="end">200</text>
+<text x="28" y="40" text-anchor="end">220</text>
+<text x="36" y="374" text-anchor="middle">0</text>
+<text x="134" y="374" text-anchor="middle">10</text>
+<text x="232" y="374" text-anchor="middle">20</text>
+<text x="330" y="374" text-anchor="middle">30</text>
+<text x="428" y="374" text-anchor="middle">40</text>
+<text x="526" y="374" text-anchor="middle">50</text>
+<text x="624" y="374" text-anchor="middle">60</text>
+<text x="50" y="392">control</text>
+<text x="200" y="392">treated</text>
+</g>
+<path d="M 330 36 V 356" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M 36 293.85 L 45.8 294.56 L 55.6 318.74 L 65.4 308.64 L 75.2 286.7 L 85 285.87 L 94.8 272.78 L 104.6 271.43 L 114.4 266.29 L 124.2 284.09 L 134 290.65 L 143.8 259.82 L 153.6 267.59 L 163.4 252.62 L 173.2 268.05 L 183 250.06 L 192.8 271.82 L 202.6 252.05 L 212.4 254.22 L 222.2 232.91 L 232 228.8 L 241.8 244.66 L 251.6 247.02 L 261.4 245.33 L 271.2 237.94 L 281 236.39 L 290.8 217.81 L 300.6 232.8 L 310.4 203.2 L 320.2 202.42 L 330 220.34 L 339.8 187.38 L 349.6 190.08 L 359.4 197.67 L 369.2 198.77 L 379 177.58 L 388.8 185.92 L 398.6 182.79 L 408.4 182.33 L 418.2 181.12 L 428 186.08 L 437.8 165.9 L 447.6 158.06 L 457.4 174.08 L 467.2 143.13 L 477 154.63 L 486.8 166.99 L 496.6 151.52 L 506.4 145.26 L 516.2 151.89 L 526 124.75 L 535.8 150.47 L 545.6 116.16 L 555.4 116.96 L 565.2 133.46 L 575 132.34 L 584.8 125.65 L 594.6 102.1 L 604.4 114.86 L 614.2 124.32" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M 36 306.51 L 45.8 296.73 L 55.6 307.5 L 65.4 294.93 L 75.2 296.78 L 85 288.57 L 94.8 276.11 L 104.6 299.31 L 114.4 297.14 L 124.2 289.6 L 134 267.89 L 143.8 267.7 L 153.6 255.54 L 163.4 258.26 L 173.2 248.05 L 183 265.19 L 192.8 258.13 L 202.6 250.56 L 212.4 239.95 L 222.2 247.25 L 232 229.76 L 241.8 243.34 L 251.6 221.01 L 261.4 232.89 L 271.2 219.13 L 281 234.74 L 290.8 206.74 L 300.6 201.65 L 310.4 225.26 L 320.2 215.77 L 330 173.03 L 339.8 154.9 L 349.6 171.66 L 359.4 177.49 L 369.2 165.46 L 379 158.26 L 388.8 135.25 L 398.6 131.59 L 408.4 135.91 L 418.2 148.21 L 428 116.48 L 437.8 130.13 L 447.6 118.35 L 457.4 137.35 L 467.2 129.19 L 477 97.81 L 486.8 119.66 L 496.6 105.3 L 506.4 115.43 L 516.2 81.94 L 526 75.91 L 535.8 80.23 L 545.6 76.89 L 555.4 77.92 L 565.2 65.35 L 575 61.85 L 584.8 72.94 L 594.6 72.89 L 604.4 41.3 L 614.2 58.31" fill="none" stroke="var(--series-2, #bc4c00)" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+<rect x="186" y="383" width="10" height="10" fill="var(--series-2, #bc4c00)"/>
+</svg>

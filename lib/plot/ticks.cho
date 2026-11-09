@@ -117,7 +117,7 @@ pub fn label[&h](heap: &!h Heap, out: buffer.Buffer, k: int, m: int, e: int) -> 
     }
     b = buffer.push_nat(heap, b, n / scale);
     b = buffer.push(heap, b, byte_of('.'));
-    let frac = n - (n / scale) * scale;
+    let frac = n - n / scale * scale;
     var z = 0;
     var pad = scale / 10;
     while pad > frac && pad > 1 {

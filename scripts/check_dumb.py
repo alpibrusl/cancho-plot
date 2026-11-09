@@ -79,11 +79,25 @@ def segment(c0, r0, c1, r1):
     return [(c0 + sg(dc) * ((2 * abs(dc) * i + n) // (2 * n)) if n else c0, r0 + sg(dr) * ((2 * abs(dr) * i + n) // (2 * n)) if n else r0) for i in range(n + 1)]
 
 
-def render(xs, ys, names, W=60, H=20, title=None, lines=False):
-    xa, ya = axis(xs, 6), axis([v for col in ys for v in col], 5)
+def render(xs, ys, names, W=60, H=20, title=None, lines=False, ann=None):
+    vl, hl, bands, diag = ann or ([], [], [], False)
+    xa, ya = axis(list(xs) + list(vl), 6), axis([v for col in ys for v in col] + list(hl) + [e for b in bands for e in b], 5)
     xlo, xhi, _, xm, xe, xk0, xk1 = xa
     ylo, yhi, _, ym, ye, yk0, yk1 = ya
     grid = [[" "] * W for _ in range(H)]
+    for lo, hi in bands:
+        for r in range(row(hi, ylo, yhi, H), row(lo, ylo, yhi, H) + 1):
+            grid[r] = [":"] * W
+    for v in hl:
+        grid[row(v, ylo, yhi, H)] = ["-"] * W
+    for v in vl:
+        c = cell(v, xlo, xhi, W)
+        for r in range(H):
+            grid[r][c] = "|"
+    t0, t1 = max(xlo, ylo), min(xhi, yhi)
+    if diag and t0 < t1:
+        for c, r in segment(cell(t0, xlo, xhi, W), row(t0, ylo, yhi, H), cell(t1, xlo, xhi, W), row(t1, ylo, yhi, H)):
+            grid[r][c] = "/"
     for s, col in enumerate(ys):
         pts = [(cell(x, xlo, xhi, W), row(y, ylo, yhi, H)) for x, y in zip(xs, col)]
         if lines:
@@ -125,6 +139,8 @@ HAND = [
      "         T\n2.0 |+        *\n1.5 |\n1.0 |     +\n0.5 |\n0.0 |*        +\n    +----------\n     0.0 1.0\n* y1  + y2\n"),
     ("a,b\n5,3\n5,3\n", ["--x", "a", "--y", "b", "--size", "10x5"],                  # constant: widened by 1 each way
      "4.0 |\n3.5 |\n3.0 |     *\n2.5 |\n2.0 |\n    +----------\n     4.0 5.0\n* b\n"),
+    ("x,y\n0,0\n1,1\n2,2\n", ["--x", "x", "--y", "y", "--size", "20x8", "--vline", "1", "--hline", "0.5", "--band", "1,1.5", "--diag"],       # the band is rows 2 to 4 (1.5 and 1.0), the hline row 6, the vline column 10
+     "2.0 |          |       /*\n    |          |    ///\n1.5 |::::::::::|:://:::::\n    |::::::::::///:::::::\n1.0 |:::::::///*:::::::::\n    |     //   |\n0.5 |--///-----|---------\n0.0 |*/        |\n    +--------------------\n     0.0 0.5  1.0  1.5\n* y\n"),
 ]
 
 
@@ -138,6 +154,28 @@ def dec(x):
         d += 1
     n = int(x * 10 ** d)
     return label(n, -d) if d else str(n)
+
+
+def random_ann(rng, scale):
+    """random annotations: (vlines, hlines, bands, diag) as Fractions, and the flags that ask for them"""
+    val = lambda: Fraction(rng.randint(-400, 400), rng.choice([1, 10, 100])) * scale
+    vl = [val() for _ in range(rng.choice([0, 0, 1, 2, 8]))]
+    hl = [val() for _ in range(rng.choice([0, 0, 1, 2, 8]))]
+    bands = []
+    for _ in range(rng.choice([0, 0, 1, 2, 4])):
+        a, b = val(), val()
+        bands.append((min(a, b), max(a, b)))
+    diag = rng.random() < 0.4
+    flags = []
+    if vl:
+        flags += ["--vline", ",".join(dec(v) for v in vl)]
+    if hl:
+        flags += ["--hline", ",".join(dec(v) for v in hl)]
+    for lo, hi in bands:
+        flags += ["--band", dec(lo) + "," + dec(hi)]
+    if diag:
+        flags += ["--diag"]
+    return (vl, hl, bands, diag), flags
 
 
 def gate(exe):
@@ -160,9 +198,10 @@ def gate(exe):
         data = "t," + ",".join(names) + nl + nl.join(dec(xs[r]) + "," + ",".join(dec(ys[j][r]) for j in range(k)) for r in range(n)) + rng.choice(["", nl])
         numeric = rng.random() < 0.3                                      # the columns by number, the last one included
         lines = rng.random() < 0.4
-        args = (["--x", "1", "--y", ",".join(str(j + 2) for j in range(k))] if numeric else ["--x", "t", "--y", ",".join(names)]) + ["--size", "%dx%d" % (W, H)] + (["--title", title] if title is not None else []) + (["--with", "lines"] if lines else rng.choice([[], ["--with", "points"]]))
+        ann, aflags = random_ann(rng, scale) if rng.random() < 0.5 else (None, [])
+        args = (["--x", "1", "--y", ",".join(str(j + 2) for j in range(k))] if numeric else ["--x", "t", "--y", ",".join(names)]) + ["--size", "%dx%d" % (W, H)] + (["--title", title] if title is not None else []) + (["--with", "lines"] if lines else rng.choice([[], ["--with", "points"]])) + aflags
         p = plot(exe, args, data)
-        want = render(xs, ys, names, W, H, title, lines)
+        want = render(xs, ys, names, W, H, title, lines, ann)
         if p.returncode != 0 or p.stdout.decode() != want:
             bad.append("random %d (%d points, %d series, %dx%d): exit %d\n%s\nwant\n%s" % (i, n, k, W, H, p.returncode, p.stdout.decode()[:400], want[:400]))
             if len(bad) > 2:
@@ -180,8 +219,26 @@ def gate(exe):
     p = plot(exe, ["--x", "x", "--y", "y", "--title", "t" * 200], "x,y\n1,2\n3,4\n")
     if p.returncode != 0:
         bad.append("a title of 200 bytes refused")
+    # ranges that only touch: x in [0, 2], y in [2, 4], so the diagonal has no length and is not drawn
+    xs, ys = [Fraction(0), Fraction(2)], [[Fraction(2), Fraction(4)]]
+    p = plot(exe, ["--x", "x", "--y", "y", "--size", "20x8", "--diag"], "x,y\n0,2\n2,4\n")
+    if p.returncode != 0 or p.stdout.decode() != render(xs, ys, ["y"], 20, 8, None, False, ([], [], [], True)):
+        bad.append("touching ranges with --diag:\n%s" % p.stdout.decode())
     ok = "x,y\n1,2\n3,4\n"
     refusals = [
+        (["--x", "x", "--y", "y", "--vline", "a"], ok, "plot.not-numeric"),
+        (["--x", "x", "--y", "y", "--vline", "1,2,3,4,5,6,7,8,9"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--hline", "1,,2"], ok, "plot.not-numeric"),
+        (["--x", "x", "--y", "y", "--hline", "1,2,3,4,5,6,7,8,9"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--vline", "1", "--vline", "2"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--band", "1"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--band", "1,2,3"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--band", "2,1"], ok, "plot.range-invalid"),
+        (["--x", "x", "--y", "y", "--band", "a,1"], ok, "plot.not-numeric"),
+        (["--x", "x", "--y", "y", "--band", "1,2", "--band", "1,2", "--band", "1,2", "--band", "1,2", "--band", "1,2"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--diag", "1"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--band", "1,1"], ok, None),                         # an empty band is a band
+        (["--x", "x", "--y", "y", "--vline", "1e300"], ok, "plot.range-invalid"),
         (["--x", "x", "--y", "y", "--with", "bars"], ok, "plot.usage"),
         (["--x", "x", "--y", "y", "--title", "a\x01b"], ok, "plot.text-invalid"),
         (["--x", "x", "--y", "y", "--title", "a\x7fb"], ok, "plot.text-invalid"),
@@ -244,6 +301,35 @@ def gate(exe):
 
 
 MUTANTS = [
+    # not listed, equivalent: `c != 2` to `c < 2` for --band in main.cho (read_list refuses a third number itself, so c is never above 2)
+    # not listed: a leftward step of the diagonal (its columns only grow and its rows only fall, so the code has no such branch)
+    ('lib/plot/dumb.cho', 'var rr = rowcell(ann[17 + 2 * u], ylo2, yhi2, hh);', 'var rr = rowcell(ann[16 + 2 * u], ylo2, yhi2, hh);'),
+    ('lib/plot/dumb.cho', 'let last = rowcell(ann[16 + 2 * u], ylo2, yhi2, hh);', 'let last = rowcell(ann[17 + 2 * u], ylo2, yhi2, hh);'),
+    ('lib/plot/dumb.cho', 'while rr <= last {', 'while rr < last {'),
+    ('lib/plot/dumb.cho', "grid[rr * w + cc] = byte_of(':');", "grid[rr * w + cc] = byte_of('.');"),
+    ('lib/plot/dumb.cho', 'let rr = rowcell(ann[8 + u], ylo2, yhi2, hh);', 'let rr = rowcell(ann[u], ylo2, yhi2, hh);'),
+    ('lib/plot/dumb.cho', "grid[rr * w + cc] = byte_of('-');", "grid[rr * w + cc] = byte_of('=');"),
+    ('lib/plot/dumb.cho', 'let cc = colcell(ann[u], xlo2, xhi2, w);', 'let cc = colcell(ann[8 + u], xlo2, xhi2, w);'),
+    ('lib/plot/dumb.cho', "grid[rr * w + cc] = byte_of('|');", "grid[rr * w + cc] = byte_of('!');"),
+    ('lib/plot/dumb.cho', 'if ac[3] == 1 && t0 < t1 {', 'if ac[3] == 1 && t0 <= t1 {'),
+    ('lib/plot/dumb.cho', 'if ac[3] == 1 && t0 < t1 {', 'if ac[3] == 0 && t0 < t1 {'),
+    ('lib/plot/dumb.cho', 'if ylo2 > t0 {', 'if ylo2 < t0 {'),
+    ('lib/plot/dumb.cho', 'if yhi2 < t1 {', 'if yhi2 > t1 {'),
+    ('lib/plot/dumb.cho', "grid[rr * w + cc] = byte_of('/');", "grid[rr * w + cc] = byte_of('7');"),
+    ('lib/plot/dumb.cho', 'while u < ac[2] {', 'while u < ac[2] - 1 {'),
+    ('lib/plot/dumb.cho', 'while u < ac[1] {', 'while u < ac[1] - 1 {'),
+    ('lib/plot/dumb.cho', 'while u < ac[0] {', 'while u < ac[0] - 1 {'),
+    ('lib/plot/axis.cho', 'while i < ac[0] {', 'while i < ac[0] - 1 {'),
+    ('lib/plot/axis.cho', 'while i < ac[1] {', 'while i < ac[1] - 1 {'),
+    ('lib/plot/axis.cho', 'while i < 2 * ac[2] {', 'while i < ac[2] {'),
+    ('lib/plot/axis.cho', 'if ann[8 + i] < ylo {', 'if ann[8 + i] > ylo {'),
+    ('lib/plot/axis.cho', 'if ann[16 + i] < ylo {', 'if ann[16 + i] > ylo {'),
+    ('lib/plot/axis.cho', 'if ann[i] > xhi {', 'if ann[i] < xhi {'),
+    ('tools/plot/main.cho', 'if ann[16 + 2 * ac[2]] > ann[17 + 2 * ac[2]] {', 'if ann[16 + 2 * ac[2]] >= ann[17 + 2 * ac[2]] {'),
+    ('tools/plot/main.cho', 'if ac[2] >= 4 {', 'if ac[2] > 4 {'),
+    ('tools/plot/main.cho', 'let c = read_list(value, ann, at, 8);', 'let c = read_list(value, ann, at, 7);'),
+    ('tools/plot/main.cho', 'if ac[slot] > 0 {', 'if ac[slot] > 1 {'),
+    ('tools/plot/main.cho', 'at = 8;\n                    slot = 1;', 'at = 8;\n                    slot = 0;'),
     ("lib/plot/dumb.cho", "let cc = c0 + sc * ((2 * dc * step + m) / (2 * m));", "let cc = c0 + sc * ((2 * dc * step + m - 1) / (2 * m));"),
     ("lib/plot/dumb.cho", "let rr = r0 + sr * ((2 * dr * step + m) / (2 * m));", "let rr = r0 + sr * ((2 * dr * step + m - 1) / (2 * m));"),
     ("lib/plot/dumb.cho", "let rr = r0 + sr * ((2 * dr * step + m) / (2 * m));", "let rr = r0 + sr * ((2 * dr * step) / (2 * m));"),
@@ -329,6 +415,6 @@ if __name__ == "__main__":
         print("FAIL:", b)
     if bad:
         sys.exit(1)
-    print("check_dumb: ok (%d hand charts, 200 random charts, 32 refusals, 200 garbage inputs)" % len(HAND))
+    print("check_dumb: ok (%d hand charts, 200 random charts, 45 refusals, 200 garbage inputs)" % len(HAND))
     if "--mutants" in sys.argv:
         mutants()

@@ -33,9 +33,10 @@ def esc(t):
     return t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def render(xs, ys, names, W=640, H=400, title=None, lines=False):
+def render(xs, ys, names, W=640, H=400, title=None, lines=False, ann=None):
     """xs, ys: Fractions (exact decimals); the program reads them as doubles."""
-    xa, ya = d.axis(xs, 6), d.axis([v for col in ys for v in col], 5)
+    vl, hl, bands, diag = ann or ([], [], [], False)
+    xa, ya = d.axis(list(xs) + list(vl), 6), d.axis([v for col in ys for v in col] + list(hl) + [e for b in bands for e in b], 5)
     fl = [float(v) for v in xs]
     fy = [[float(v) for v in col] for col in ys]
     xlo, xhi = float(xa[0]), float(xa[1])
@@ -76,6 +77,16 @@ def render(xs, ys, names, W=640, H=400, title=None, lines=False):
     for j, nm in enumerate(names):
         out.append('<text x="%s" y="%s">%s</text>' % (fx(x0 + 150 * j + 14), fx(H - 8), esc(nm)))
     out.append('</g>')
+    dash = ' fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>'
+    for lo, hi in bands:
+        out.append('<rect x="%s" y="%s" width="%s" height="%s" fill="var(--band, currentColor)" fill-opacity="0.12"/>' % (fx(x0), fx(Y(float(hi))), fx(x1 - x0), fx(Y(float(lo)) - Y(float(hi)))))
+    for v in hl:
+        out.append('<path d="M %s %s H %s"%s' % (fx(x0), fx(Y(float(v))), fx(x1), dash))
+    for v in vl:
+        out.append('<path d="M %s %s V %s"%s' % (fx(X(float(v))), fx(y1), fx(y2), dash))
+    t0, t1 = max(xlo, ylo), min(xhi, yhi)
+    if diag and t0 < t1:
+        out.append('<path d="M %s %s L %s %s" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="1 3"/>' % (fx(X(t0)), fx(Y(t0)), fx(X(t1)), fx(Y(t1))))
     for j in range(k):
         pts = [(X(a), Y(b)) for a, b in zip(fl, fy[j])]
         if lines:
@@ -118,10 +129,11 @@ def gate(exe):
         title = rng.choice([None, "t", "A & B <title> \"q\"", "x" * 60, "\u0100\u00e9"])
         names = ["s%d" % j if rng.random() < 0.7 else "n<%d>&" % j for j in range(k)]
         lines = rng.random() < 0.5
+        ann, aflags = d.random_ann(rng, scale) if rng.random() < 0.5 else (None, [])
         header = "t," + ",".join(names)
         data = header + "\n" + "".join(d.dec(xs[r]) + "," + ",".join(d.dec(ys[j][r]) for j in range(k)) + "\n" for r in range(n))
-        args = ["--x", "t", "--y", ",".join(names), "--term", "svg", "--size", "%dx%d" % (W, H)] + (["--title", title] if title is not None else []) + (["--with", "lines"] if lines else [])
-        want = render(xs, ys, names, W, H, title, lines)
+        args = ["--x", "t", "--y", ",".join(names), "--term", "svg", "--size", "%dx%d" % (W, H)] + (["--title", title] if title is not None else []) + (["--with", "lines"] if lines else []) + aflags
+        want = render(xs, ys, names, W, H, title, lines, ann)
         p = run(exe, args, data)
         got = p.stdout.decode()
         if want is None:
@@ -148,6 +160,11 @@ def gate(exe):
     p = run(exe, ["--x", "x", "--y", "y", "--term", "svg", "--size", "103x300"], "x,y\n0,1000\n1,1000.05\n")
     if p.returncode != 2 or b"plot.size-invalid" not in p.stderr:
         bad.append("W=103 with 7-character labels should leave 19 pixels: exit %d" % p.returncode)
+    # ranges that only touch: x in [0, 2], y in [2, 4], so the diagonal has no length and is not drawn
+    xs, ys = [Fraction(0), Fraction(2)], [[Fraction(2), Fraction(4)]]
+    p = run(exe, ["--x", "x", "--y", "y", "--term", "svg", "--diag"], "x,y\n0,2\n2,4\n")
+    if p.returncode != 0 or p.stdout.decode() != render(xs, ys, ["y"], 640, 400, None, False, ([], [], [], True)):
+        bad.append("touching ranges with --diag:\n%s" % p.stdout.decode()[:300])
     ok = "x,y\n1,2\n3,4\n"
     refusals = [
         (["--x", "x", "--y", "y", "--term", "svg", "--title", "a\x1fb"], ok, "plot.text-invalid"),
@@ -189,6 +206,23 @@ def gate(exe):
 
 
 MUTANTS = [
+    ('lib/plot/svg.cho', 'let ytop = y1f + (yhi2 - ann[17 + 2 * u])', 'let ytop = y1f + (yhi2 - ann[16 + 2 * u])'),
+    ('lib/plot/svg.cho', 'let ybot = y1f + (yhi2 - ann[16 + 2 * u])', 'let ybot = y1f + (yhi2 - ann[17 + 2 * u])'),
+    ('lib/plot/svg.cho', 'out = num(heap, out, ybot - ytop);', 'out = num(heap, out, ybot - ytop + 1.0);'),
+    ('lib/plot/svg.cho', 'fill-opacity=\\"0.12\\"', 'fill-opacity=\\"0.2\\"'),
+    ('lib/plot/svg.cho', 'var(--band, currentColor)', 'var(--bands, currentColor)'),
+    ('lib/plot/svg.cho', 'stroke-dasharray=\\"4 3\\"/>");\n        out = nl(heap, out);\n        u = u + 1;\n    }\n    u = 0;\n    while u < ac[0] {', 'stroke-dasharray=\\"4 4\\"/>");\n        out = nl(heap, out);\n        u = u + 1;\n    }\n    u = 0;\n    while u < ac[0] {'),
+    ('lib/plot/svg.cho', 'stroke-dasharray=\\"4 3\\"/>");\n        out = nl(heap, out);\n        u = u + 1;\n    }\n    var t0', 'stroke-dasharray=\\"4 4\\"/>");\n        out = nl(heap, out);\n        u = u + 1;\n    }\n    var t0'),
+    ('lib/plot/svg.cho', 'stroke-dasharray=\\"1 3\\"', 'stroke-dasharray=\\"1 4\\"'),
+    ('lib/plot/svg.cho', 'let yy = y1f + (yhi2 - ann[8 + u])', 'let yy = y1f + (yhi2 - ann[u])'),
+    ('lib/plot/svg.cho', 'let xx = x0f + (ann[u] - xlo2)', 'let xx = x0f + (ann[8 + u] - xlo2)'),
+    ('lib/plot/svg.cho', 'if ac[3] == 1 && t0 < t1 {', 'if ac[3] == 1 && t0 <= t1 {'),
+    ('lib/plot/svg.cho', 'if ylo2 > t0 {', 'if ylo2 < t0 {'),
+    ('lib/plot/svg.cho', 'if yhi2 < t1 {', 'if yhi2 > t1 {'),
+    ('lib/plot/svg.cho', 'out = num(heap, out, x0f + (t1 - xlo2) / (xhi2 - xlo2) * pw);', 'out = num(heap, out, x0f + (t0 - xlo2) / (xhi2 - xlo2) * pw);'),
+    ('lib/plot/svg.cho', 'while u < ac[2] {', 'while u < ac[2] - 1 {'),
+    ('lib/plot/svg.cho', 'while u < ac[1] {', 'while u < ac[1] - 1 {'),
+    ('lib/plot/svg.cho', 'while u < ac[0] {', 'while u < ac[0] - 1 {'),
         # not listed, equivalent: `end > 0` to `end > 1` in svg.num (the text always has a point, where the loop stops)
     ("lib/plot/svg.cho", "if end > 0 && int_of(sc[end - 1]) == '.' {", "if end > 1 && int_of(sc[end - 1]) == '.' && false {"),
     ("lib/plot/svg.cho", "out = buffer.append(heap, out, \"&amp;\");", "out = buffer.append(heap, out, \"&\");"),

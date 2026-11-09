@@ -3,7 +3,8 @@ edition 9;
 // `plot` -- plots as a command line (docs/design.md). Built so far:
 //
 //     plot ticks LO HI [N]     the nice ticks of the range [LO, HI] aimed at N intervals (default 5), one label a line
-//     plot --x COL --y COL[,COL..] [--with points|lines] [--term dumb|svg] [--size WxH] [--title TEXT] < table.csv     a chart (docs/design.md sections 11 and 13)
+//     plot --x COL --y COL[,COL..] [--with points|lines] [--term dumb|svg] [--size WxH] [--title TEXT]
+//                          [--vline X,..] [--hline Y,..] [--band LO,HI].. [--diag] < table.csv     a chart (docs/design.md sections 11, 13 and 15)
 //
 // A refusal prints nothing on standard output and, on standard error, one JSON line `{"error":"plot.<rule>","message":"...","repair":"..."}`; exit status 2.
 // Authority: arguments, standard input, standard output and standard error; no file, no network, no clock.
@@ -136,7 +137,40 @@ fn size_of[&s](text: &s [byte]) -> [] (int, int) {
     return (num.natural(text[0..at]), num.natural(text[at + 1..len(text)]));
 }
 
+// the numbers of the comma-separated `text`, written into `ann` from position `at`: how many there are, or -1 when one is not a number, -2 when there are more than `room`
+fn read_list[&s, &a](text: &s [byte], ann: &!a [float], at: int, room: int) -> [] int {
+    var count = 0;
+    var start = 0;
+    var k = 0;
+    while k <= len(text) {
+        if k == len(text) || int_of(text[k]) == ',' {
+            let (ok, v) = num.number(text[start..k]);
+            if !ok {
+                return 0 - 1;
+            }
+            if count >= room {
+                return 0 - 2;
+            }
+            ann[at + count] = v;
+            count = count + 1;
+            start = k + 1;
+        }
+        k = k + 1;
+    }
+    return count;
+}
+
 fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_read, io_write, err_write, args] int {
+    var status = 2;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        status = do_chart_with(heap, io, args, ann, ac);
+    }
+    return status;
+}
+
+fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, ann: &!a [float], ac: &!c [int]) -> [heap, io_read, io_write, err_write, args] int {
     var xspec = "";
     var yspec = "";
     var title = "";
@@ -150,49 +184,87 @@ fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_
     var seen_y = false;
     while k < arg_count(args) {
         let flag = arg(args, k);
-        if k + 1 >= arg_count(args) {
-            return refuse(io, "plot.usage", "a flag needs a value", "plot --x COL --y COL[,COL..] [--size WxH] [--title TEXT] [--term dumb]");
-        }
-        let value = arg(args, k + 1);
-        if bytes.equal(flag, "--x") {
-            xspec = value;
-            seen_x = true;
-        } else if bytes.equal(flag, "--y") {
-            yspec = value;
-            seen_y = true;
-        } else if bytes.equal(flag, "--title") {
-            if len(value) > 200 {
-                return refuse(io, "plot.usage", "the title is longer than 200 bytes", "shorten it");
-            }
-            title = value;
-            has_title = true;
-        } else if bytes.equal(flag, "--term") {
-            if bytes.equal(value, "svg") {
-                svg_term = true;
-            } else if bytes.equal(value, "dumb") {
-                svg_term = false;
-            } else {
-                return refuse(io, "plot.usage", "the terminals are dumb and svg", "--term svg");
-            }
-        } else if bytes.equal(flag, "--with") {
-            if bytes.equal(value, "lines") {
-                lines = true;
-            } else if bytes.equal(value, "points") {
-                lines = false;
-            } else {
-                return refuse(io, "plot.usage", "--with takes points or lines", "--with lines");
-            }
-        } else if bytes.equal(flag, "--size") {
-            let (a, b) = size_of(value);
-            sw = a;
-            sh = b;
-            if a < 0 || b < 0 {
-                return refuse(io, "plot.size-invalid", "the size is WxH", "--size 60x20");
-            }
+        if bytes.equal(flag, "--diag") {
+            ac[3] = 1;
+            k = k + 1;
         } else {
-            return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --with --term --size --title");
+            if k + 1 >= arg_count(args) {
+                return refuse(io, "plot.usage", "a flag needs a value", "plot --x COL --y COL[,COL..] [--size WxH] [--title TEXT] [--term dumb]");
+            }
+            let value = arg(args, k + 1);
+            if bytes.equal(flag, "--x") {
+                xspec = value;
+                seen_x = true;
+            } else if bytes.equal(flag, "--y") {
+                yspec = value;
+                seen_y = true;
+            } else if bytes.equal(flag, "--title") {
+                if len(value) > 200 {
+                    return refuse(io, "plot.usage", "the title is longer than 200 bytes", "shorten it");
+                }
+                title = value;
+                has_title = true;
+            } else if bytes.equal(flag, "--term") {
+                if bytes.equal(value, "svg") {
+                    svg_term = true;
+                } else if bytes.equal(value, "dumb") {
+                    svg_term = false;
+                } else {
+                    return refuse(io, "plot.usage", "the terminals are dumb and svg", "--term svg");
+                }
+            } else if bytes.equal(flag, "--vline") || bytes.equal(flag, "--hline") {
+                var at = 0;
+                var slot = 0;
+                if bytes.equal(flag, "--hline") {
+                    at = 8;
+                    slot = 1;
+                }
+                if ac[slot] > 0 {
+                    return refuse(io, "plot.usage", "a flag is given once", "list the values with commas: --vline 3,9");
+                }
+                let c = read_list(value, ann, at, 8);
+                if c == 0 - 1 {
+                    return refuse(io, "plot.not-numeric", "a marker value is not a number", "--vline 35 or --hline 1.25");
+                }
+                if c == 0 - 2 {
+                    return refuse(io, "plot.usage", "at most 8 values for --vline or --hline", "plot fewer markers");
+                }
+                ac[slot] = c;
+            } else if bytes.equal(flag, "--band") {
+                if ac[2] >= 4 {
+                    return refuse(io, "plot.usage", "at most 4 --band", "plot fewer bands");
+                }
+                let c = read_list(value, ann, 16 + 2 * ac[2], 2);
+                if c == 0 - 1 {
+                    return refuse(io, "plot.not-numeric", "a band end is not a number", "--band LO,HI");
+                }
+                if c != 2 {
+                    return refuse(io, "plot.usage", "--band takes two numbers, LO,HI", "--band 1.0,1.5");
+                }
+                if ann[16 + 2 * ac[2]] > ann[17 + 2 * ac[2]] {
+                    return refuse(io, "plot.range-invalid", "a band has LO above HI", "--band LO,HI with LO at most HI");
+                }
+                ac[2] = ac[2] + 1;
+            } else if bytes.equal(flag, "--with") {
+                if bytes.equal(value, "lines") {
+                    lines = true;
+                } else if bytes.equal(value, "points") {
+                    lines = false;
+                } else {
+                    return refuse(io, "plot.usage", "--with takes points or lines", "--with lines");
+                }
+            } else if bytes.equal(flag, "--size") {
+                let (a, b) = size_of(value);
+                sw = a;
+                sh = b;
+                if a < 0 || b < 0 {
+                    return refuse(io, "plot.size-invalid", "the size is WxH", "--size 60x20");
+                }
+            } else {
+                return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --with --term --size --title --vline --hline --band --diag");
+            }
+            k = k + 2;
         }
-        k = k + 2;
     }
     if !seen_x || !seen_y {
         return refuse(io, "plot.usage", "--x and --y are needed", "plot --x day --y net < table.csv");
@@ -224,7 +296,7 @@ fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_
         status = refuse(io, "plot.too-many-points", "the input is longer than 16 MiB", "plot fewer rows");
     } else {
         borrow text as &tb in {
-            let (code, line, chart) = chart.draw(heap, buffer.bytes(tb), xspec, yspec, w, hh, title, has_title, lines, svg_term);
+            let (code, line, chart) = chart.draw(heap, buffer.bytes(tb), xspec, yspec, w, hh, title, has_title, lines, svg_term, ann, ac);
             if code == 0 {
                 borrow chart as &cb in {
                     let wr = buffer.write(io, cb);

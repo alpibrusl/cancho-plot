@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>cancho-plot</title>
+<meta name="description" content="Plots as an agent-first command line, written in cancho: SVG and text charts from CSV on standard input."/>
+<style>
+:root{--bg:#ffffff;--fg:#1f2328;--muted:#59636e;--line:#d1d9e0;--card:#f6f8fa;--accent:#0550ae;--series-1:#0550ae;--series-2:#bc4c00;--series-3:#1a7f37;--series-4:#8250df;--series-5:#cf222e;--band:#0550ae}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121212;--fg:#e6edf3;--muted:#9198a1;--line:#30363d;--card:#1b1f24;--accent:#79c0ff;--series-1:#79c0ff;--series-2:#ffa657;--series-3:#56d364;--series-4:#d2a8ff;--series-5:#ff7b72;--band:#79c0ff}}
+:root[data-theme="dark"]{--bg:#121212;--fg:#e6edf3;--muted:#9198a1;--line:#30363d;--card:#1b1f24;--accent:#79c0ff;--series-1:#79c0ff;--series-2:#ffa657;--series-3:#56d364;--series-4:#d2a8ff;--series-5:#ff7b72;--band:#79c0ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:70rem;margin:0 auto;padding:0 16px 4rem}
+header{padding:3.5rem 0 1.5rem}
+h1{font-size:2.4rem;margin:0 0 .25rem;letter-spacing:-.02em}
+h2{font-size:1.4rem;margin:3rem 0 .5rem}
+h3{font-size:1.05rem;margin:0 0 .25rem}
+p{margin:.4rem 0}
+.lead{font-size:1.2rem;color:var(--muted);max-width:44rem}
+a{color:var(--accent)}
+code,pre{font:.9rem/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;margin:.5rem 0}
+code{background:var(--card);border-radius:4px;padding:.05em .3em}
+pre code{background:none;padding:0}
+.gallery{display:grid;grid-template-columns:1fr;gap:20px}
+@media (min-width:60rem){.gallery{grid-template-columns:1fr 1fr}}
+figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--bg);min-width:0}
+figure .chart svg{width:100%;height:auto;display:block;color:var(--fg)}
+figure .cmd{font-size:.85rem;color:var(--muted)}
+figure .cmd code{word-break:break-word}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:12px;margin:1rem 0}
+.facts div{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--card)}
+.facts strong{display:block}
+footer{border-top:1px solid var(--line);margin-top:3rem;padding-top:1rem;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>cancho-plot</h1>
+<p class="lead">Plots as a command line an agent can read. A table goes in on standard input; an SVG, or the same chart as text, comes out. Written in <a href="https://github.com/alpibrusl/cancho">cancho</a>, in the family of <code>table</code>, <code>ml</code> and <code>stats</code>.</p>
+<pre><code>table --format csv ... | plot --x day --y net,margin --with lines --term svg --title "Net margin" &gt; net.svg
+table --format csv ... | plot --x day --y net --term dumb          # the same chart as text</code></pre>
+</header>
+
+<section class="facts">
+<div><strong>Byte-stable</strong>The same table and flags give the same bytes: no clock, no random, no ids. Labels are written from integers, never from float formatting.</div>
+<div><strong>Errors are data</strong>A refusal is one JSON line on standard error with a rule tag such as <code>plot.not-numeric</code>, and exit status 2. No input reaches a crash.</div>
+<div><strong>Little authority</strong>It reads standard input and writes standard output. No file, no network, no clock: the compiler checks that the program can do nothing else.</div>
+<div><strong>Tested against a second implementation</strong>Every chart in the gates is also drawn by an independent program in exact arithmetic, and mutants of the source must make a gate fail.</div>
+</section>
+
+<h2>Gallery</h2>
+<p>Everything below is what the binary writes, made by <code>scripts/make_gallery.py</code> and checked by <code>scripts/check_site.py</code>: if the tool changes, this page fails its check until it is made again.</p>
+<section class="gallery">
+<figure id="lines">
+<h3>Two series, a title, and a marker where the service starts</h3>
+<p>The net margin of the control and of the treated hotels per day. <code>--vline 30</code> draws the dashed marker; both axes widen to the next 1-2-5 tick.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Net margin per hotel-day: 2 series, 60 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 310.29 h-4"/>
+<path d="M 36 264.57 h-4"/>
+<path d="M 36 218.86 h-4"/>
+<path d="M 36 173.14 h-4"/>
+<path d="M 36 127.43 h-4"/>
+<path d="M 36 81.71 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 36 356 v4"/>
+<path d="M 134 356 v4"/>
+<path d="M 232 356 v4"/>
+<path d="M 330 356 v4"/>
+<path d="M 428 356 v4"/>
+<path d="M 526 356 v4"/>
+<path d="M 624 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Net margin per hotel-day</text>
+<text x="28" y="360" text-anchor="end">80</text>
+<text x="28" y="314.29" text-anchor="end">100</text>
+<text x="28" y="268.57" text-anchor="end">120</text>
+<text x="28" y="222.86" text-anchor="end">140</text>
+<text x="28" y="177.14" text-anchor="end">160</text>
+<text x="28" y="131.43" text-anchor="end">180</text>
+<text x="28" y="85.71" text-anchor="end">200</text>
+<text x="28" y="40" text-anchor="end">220</text>
+<text x="36" y="374" text-anchor="middle">0</text>
+<text x="134" y="374" text-anchor="middle">10</text>
+<text x="232" y="374" text-anchor="middle">20</text>
+<text x="330" y="374" text-anchor="middle">30</text>
+<text x="428" y="374" text-anchor="middle">40</text>
+<text x="526" y="374" text-anchor="middle">50</text>
+<text x="624" y="374" text-anchor="middle">60</text>
+<text x="50" y="392">control</text>
+<text x="200" y="392">treated</text>
+</g>
+<path d="M 330 36 V 356" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M 36 293.85 L 45.8 294.56 L 55.6 318.74 L 65.4 308.64 L 75.2 286.7 L 85 285.87 L 94.8 272.78 L 104.6 271.43 L 114.4 266.29 L 124.2 284.09 L 134 290.65 L 143.8 259.82 L 153.6 267.59 L 163.4 252.62 L 173.2 268.05 L 183 250.06 L 192.8 271.82 L 202.6 252.05 L 212.4 254.22 L 222.2 232.91 L 232 228.8 L 241.8 244.66 L 251.6 247.02 L 261.4 245.33 L 271.2 237.94 L 281 236.39 L 290.8 217.81 L 300.6 232.8 L 310.4 203.2 L 320.2 202.42 L 330 220.34 L 339.8 187.38 L 349.6 190.08 L 359.4 197.67 L 369.2 198.77 L 379 177.58 L 388.8 185.92 L 398.6 182.79 L 408.4 182.33 L 418.2 181.12 L 428 186.08 L 437.8 165.9 L 447.6 158.06 L 457.4 174.08 L 467.2 143.13 L 477 154.63 L 486.8 166.99 L 496.6 151.52 L 506.4 145.26 L 516.2 151.89 L 526 124.75 L 535.8 150.47 L 545.6 116.16 L 555.4 116.96 L 565.2 133.46 L 575 132.34 L 584.8 125.65 L 594.6 102.1 L 604.4 114.86 L 614.2 124.32" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M 36 306.51 L 45.8 296.73 L 55.6 307.5 L 65.4 294.93 L 75.2 296.78 L 85 288.57 L 94.8 276.11 L 104.6 299.31 L 114.4 297.14 L 124.2 289.6 L 134 267.89 L 143.8 267.7 L 153.6 255.54 L 163.4 258.26 L 173.2 248.05 L 183 265.19 L 192.8 258.13 L 202.6 250.56 L 212.4 239.95 L 222.2 247.25 L 232 229.76 L 241.8 243.34 L 251.6 221.01 L 261.4 232.89 L 271.2 219.13 L 281 234.74 L 290.8 206.74 L 300.6 201.65 L 310.4 225.26 L 320.2 215.77 L 330 173.03 L 339.8 154.9 L 349.6 171.66 L 359.4 177.49 L 369.2 165.46 L 379 158.26 L 388.8 135.25 L 398.6 131.59 L 408.4 135.91 L 418.2 148.21 L 428 116.48 L 437.8 130.13 L 447.6 118.35 L 457.4 137.35 L 467.2 129.19 L 477 97.81 L 486.8 119.66 L 496.6 105.3 L 506.4 115.43 L 516.2 81.94 L 526 75.91 L 535.8 80.23 L 545.6 76.89 L 555.4 77.92 L 565.2 65.35 L 575 61.85 L 584.8 72.94 L 594.6 72.89 L 604.4 41.3 L 614.2 58.31" fill="none" stroke="var(--series-2, #bc4c00)" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+<rect x="186" y="383" width="10" height="10" fill="var(--series-2, #bc4c00)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x day --y control,treated --with lines --term svg --title 'Net margin per hotel-day' --vline 30 &lt; net.csv</code> <a href="data/net.csv">the table</a> <a href="gallery/lines.svg">the svg</a></p>
+</figure>
+<figure id="diagonal">
+<h3>Forecast against realised, with the diagonal</h3>
+<p>Points, and <code>--diag</code> for the line where the forecast is exact. The range is the same on both axes, so the diagonal runs corner to corner.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Calibration: 1 series, 40 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 36 356 v4"/>
+<path d="M 94.8 356 v4"/>
+<path d="M 153.6 356 v4"/>
+<path d="M 212.4 356 v4"/>
+<path d="M 271.2 356 v4"/>
+<path d="M 330 356 v4"/>
+<path d="M 388.8 356 v4"/>
+<path d="M 447.6 356 v4"/>
+<path d="M 506.4 356 v4"/>
+<path d="M 565.2 356 v4"/>
+<path d="M 624 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Calibration</text>
+<text x="28" y="360" text-anchor="end">0</text>
+<text x="28" y="296" text-anchor="end">20</text>
+<text x="28" y="232" text-anchor="end">40</text>
+<text x="28" y="168" text-anchor="end">60</text>
+<text x="28" y="104" text-anchor="end">80</text>
+<text x="28" y="40" text-anchor="end">100</text>
+<text x="36" y="374" text-anchor="middle">0</text>
+<text x="94.8" y="374" text-anchor="middle">10</text>
+<text x="153.6" y="374" text-anchor="middle">20</text>
+<text x="212.4" y="374" text-anchor="middle">30</text>
+<text x="271.2" y="374" text-anchor="middle">40</text>
+<text x="330" y="374" text-anchor="middle">50</text>
+<text x="388.8" y="374" text-anchor="middle">60</text>
+<text x="447.6" y="374" text-anchor="middle">70</text>
+<text x="506.4" y="374" text-anchor="middle">80</text>
+<text x="565.2" y="374" text-anchor="middle">90</text>
+<text x="624" y="374" text-anchor="middle">100</text>
+<text x="50" y="392">realised</text>
+</g>
+<path d="M 36 356 L 624 36" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="1 3"/>
+<path d="M 260.62 236.64 h0 M 517.57 112.64 h0 M 506.4 126.62 h0 M 408.2 162.91 h0 M 327.65 206.98 h0 M 405.26 180.06 h0 M 435.84 154.72 h0 M 487 135.46 h0 M 239.45 255.55 h0 M 487 127.87 h0 M 84.8 322.72 h0 M 501.7 128.61 h0 M 117.14 315.62 h0 M 213.58 257.86 h0 M 307.07 223.97 h0 M 165.36 288.35 h0 M 389.98 182.98 h0 M 84.8 324.96 h0 M 131.26 301.02 h0 M 442.31 143.07 h0 M 523.45 115.07 h0 M 381.16 191.23 h0 M 114.79 309.6 h0 M 125.38 317.22 h0 M 260.62 240.96 h0 M 538.74 94.82 h0 M 154.19 296.61 h0 M 330.59 211.52 h0 M 583.43 85.44 h0 M 245.92 260.26 h0 M 275.32 236.58 h0 M 452.89 145.86 h0 M 239.45 247.71 h0 M 507.58 114.3 h0 M 313.54 214.02 h0 M 68.93 344.42 h0 M 163.6 294.18 h0 M 590.48 75.58 h0 M 242.98 255.42 h0 M 126.55 308.13 h0" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="4" stroke-linecap="round"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x forecast --y realised --term svg --title Calibration --diag &lt; calibration.csv</code> <a href="data/calibration.csv">the table</a> <a href="gallery/diagonal.svg">the svg</a></p>
+</figure>
+<figure id="band">
+<h3>A band and a floor</h3>
+<p>An estimate against its floor. <code>--band 125,150</code> shades the target, <code>--hline 125</code> marks the floor; the y range grows to hold them.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Weekly estimate: 1 series, 12 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 316 h-4"/>
+<path d="M 36 276 h-4"/>
+<path d="M 36 236 h-4"/>
+<path d="M 36 196 h-4"/>
+<path d="M 36 156 h-4"/>
+<path d="M 36 116 h-4"/>
+<path d="M 36 76 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 36 356 v4"/>
+<path d="M 134 356 v4"/>
+<path d="M 232 356 v4"/>
+<path d="M 330 356 v4"/>
+<path d="M 428 356 v4"/>
+<path d="M 526 356 v4"/>
+<path d="M 624 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Weekly estimate</text>
+<text x="28" y="360" text-anchor="end">0</text>
+<text x="28" y="320" text-anchor="end">20</text>
+<text x="28" y="280" text-anchor="end">40</text>
+<text x="28" y="240" text-anchor="end">60</text>
+<text x="28" y="200" text-anchor="end">80</text>
+<text x="28" y="160" text-anchor="end">100</text>
+<text x="28" y="120" text-anchor="end">120</text>
+<text x="28" y="80" text-anchor="end">140</text>
+<text x="28" y="40" text-anchor="end">160</text>
+<text x="36" y="374" text-anchor="middle">0</text>
+<text x="134" y="374" text-anchor="middle">2</text>
+<text x="232" y="374" text-anchor="middle">4</text>
+<text x="330" y="374" text-anchor="middle">6</text>
+<text x="428" y="374" text-anchor="middle">8</text>
+<text x="526" y="374" text-anchor="middle">10</text>
+<text x="624" y="374" text-anchor="middle">12</text>
+<text x="50" y="392">estimate</text>
+</g>
+<rect x="36" y="56" width="588" height="50" fill="var(--band, currentColor)" fill-opacity="0.12"/>
+<path d="M 36 106 H 624" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M 85 353.4 L 134 353.44 L 183 353.04 L 232 352.76 L 281 352.82 L 330 352.6 L 379 352.3 L 428 352.08 L 477 352.32 L 526 352.2 L 575 351.74 L 624 351.76" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x week --y estimate --with lines --term svg --title 'Weekly estimate' --band 125,150 --hline 125 &lt; estimate.csv</code> <a href="data/estimate.csv">the table</a> <a href="gallery/band.svg">the svg</a></p>
+</figure>
+<figure id="five">
+<h3>Five series</h3>
+<p>The most there is: five series, five colours. The colours are CSS variables (<code>--series-1</code> to <code>--series-5</code>), so a page themes them, as this one does for dark mode.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" role="img" aria-label="5 series, 20 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 12 V 316 H 624"/>
+<path d="M 36 316 h-4"/>
+<path d="M 36 265.33 h-4"/>
+<path d="M 36 214.67 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 113.33 h-4"/>
+<path d="M 36 62.67 h-4"/>
+<path d="M 36 12 h-4"/>
+<path d="M 36 316 v4"/>
+<path d="M 183 316 v4"/>
+<path d="M 330 316 v4"/>
+<path d="M 477 316 v4"/>
+<path d="M 624 316 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="28" y="320" text-anchor="end">-10</text>
+<text x="28" y="269.33" text-anchor="end">0</text>
+<text x="28" y="218.67" text-anchor="end">10</text>
+<text x="28" y="168" text-anchor="end">20</text>
+<text x="28" y="117.33" text-anchor="end">30</text>
+<text x="28" y="66.67" text-anchor="end">40</text>
+<text x="28" y="16" text-anchor="end">50</text>
+<text x="36" y="334" text-anchor="middle">0</text>
+<text x="183" y="334" text-anchor="middle">5</text>
+<text x="330" y="334" text-anchor="middle">10</text>
+<text x="477" y="334" text-anchor="middle">15</text>
+<text x="624" y="334" text-anchor="middle">20</text>
+<text x="50" y="352">a</text>
+<text x="200" y="352">b</text>
+<text x="350" y="352">c</text>
+<text x="500" y="352">d</text>
+<text x="650" y="352">e</text>
+</g>
+<path d="M 36 265.33 L 65.4 260.27 L 94.8 255.2 L 124.2 250.13 L 153.6 245.07 L 183 240 L 212.4 234.93 L 241.8 229.87 L 271.2 224.8 L 300.6 219.73 L 330 214.67 L 359.4 209.6 L 388.8 204.53 L 418.2 199.47 L 447.6 194.4 L 477 189.33 L 506.4 184.27 L 535.8 179.2 L 565.2 174.13 L 594.6 169.07" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M 36 290.67 L 65.4 280.53 L 94.8 270.4 L 124.2 260.27 L 153.6 250.13 L 183 240 L 212.4 229.87 L 241.8 219.73 L 271.2 209.6 L 300.6 199.47 L 330 189.33 L 359.4 179.2 L 388.8 169.07 L 418.2 158.93 L 447.6 148.8 L 477 138.67 L 506.4 128.53 L 535.8 118.4 L 565.2 108.27 L 594.6 98.13" fill="none" stroke="var(--series-2, #bc4c00)" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M 36 265.33 L 65.4 265.33 L 94.8 265.33 L 124.2 260.27 L 153.6 255.2 L 183 250.13 L 212.4 245.07 L 241.8 234.93 L 271.2 224.8 L 300.6 214.67 L 330 204.53 L 359.4 189.33 L 388.8 174.13 L 418.2 158.93 L 447.6 143.73 L 477 123.47 L 506.4 103.2 L 535.8 82.93 L 565.2 62.67 L 594.6 37.33" fill="none" stroke="var(--series-3, #1a7f37)" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M 36 164 L 65.4 169.07 L 94.8 174.13 L 124.2 179.2 L 153.6 184.27 L 183 189.33 L 212.4 194.4 L 241.8 199.47 L 271.2 204.53 L 300.6 209.6 L 330 214.67 L 359.4 219.73 L 388.8 224.8 L 418.2 229.87 L 447.6 234.93 L 477 240 L 506.4 245.07 L 535.8 250.13 L 565.2 255.2 L 594.6 260.27" fill="none" stroke="var(--series-4, #8250df)" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M 36 224.8 L 65.4 209.6 L 94.8 194.4 L 124.2 179.2 L 153.6 219.73 L 183 204.53 L 212.4 189.33 L 241.8 174.13 L 271.2 214.67 L 300.6 199.47 L 330 184.27 L 359.4 224.8 L 388.8 209.6 L 418.2 194.4 L 447.6 179.2 L 477 219.73 L 506.4 204.53 L 535.8 189.33 L 565.2 174.13 L 594.6 214.67" fill="none" stroke="var(--series-5, #cf222e)" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="36" y="343" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+<rect x="186" y="343" width="10" height="10" fill="var(--series-2, #bc4c00)"/>
+<rect x="336" y="343" width="10" height="10" fill="var(--series-3, #1a7f37)"/>
+<rect x="486" y="343" width="10" height="10" fill="var(--series-4, #8250df)"/>
+<rect x="636" y="343" width="10" height="10" fill="var(--series-5, #cf222e)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x x --y a,b,c,d,e --with lines --term svg --size 640x360 &lt; five.csv</code> <a href="data/five.csv">the table</a> <a href="gallery/five.svg">the svg</a></p>
+</figure>
+<figure id="real">
+<h3>A real series: 302 days of a holdout's margin</h3>
+<p>The daily margin per hotel of a holdout in a simulated metasearch-bidding run (400 hotels, 330 days). Points, as they are; 302 rows, one second of work.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Holdout margin per hotel-day: 1 series, 302 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 28 36 V 356 H 624"/>
+<path d="M 28 356 h-4"/>
+<path d="M 28 310.29 h-4"/>
+<path d="M 28 264.57 h-4"/>
+<path d="M 28 218.86 h-4"/>
+<path d="M 28 173.14 h-4"/>
+<path d="M 28 127.43 h-4"/>
+<path d="M 28 81.71 h-4"/>
+<path d="M 28 36 h-4"/>
+<path d="M 28 356 v4"/>
+<path d="M 113.14 356 v4"/>
+<path d="M 198.29 356 v4"/>
+<path d="M 283.43 356 v4"/>
+<path d="M 368.57 356 v4"/>
+<path d="M 453.71 356 v4"/>
+<path d="M 538.86 356 v4"/>
+<path d="M 624 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Holdout margin per hotel-day</text>
+<text x="20" y="360" text-anchor="end">-2</text>
+<text x="20" y="314.29" text-anchor="end">-1</text>
+<text x="20" y="268.57" text-anchor="end">0</text>
+<text x="20" y="222.86" text-anchor="end">1</text>
+<text x="20" y="177.14" text-anchor="end">2</text>
+<text x="20" y="131.43" text-anchor="end">3</text>
+<text x="20" y="85.71" text-anchor="end">4</text>
+<text x="20" y="40" text-anchor="end">5</text>
+<text x="28" y="374" text-anchor="middle">0</text>
+<text x="113.14" y="374" text-anchor="middle">50</text>
+<text x="198.29" y="374" text-anchor="middle">100</text>
+<text x="283.43" y="374" text-anchor="middle">150</text>
+<text x="368.57" y="374" text-anchor="middle">200</text>
+<text x="453.71" y="374" text-anchor="middle">250</text>
+<text x="538.86" y="374" text-anchor="middle">300</text>
+<text x="624" y="374" text-anchor="middle">350</text>
+<text x="42" y="392">margin</text>
+</g>
+<path d="M 28 172.96 h0 M 29.7 257.9 h0 M 31.41 225.9 h0 M 33.11 264.53 h0 M 34.81 262.56 h0 M 36.51 231.25 h0 M 38.22 271.34 h0 M 39.92 261.74 h0 M 41.62 172.32 h0 M 43.33 135.43 h0 M 45.03 288.39 h0 M 46.73 266.35 h0 M 48.43 141.14 h0 M 50.14 285.05 h0 M 51.84 196.41 h0 M 53.54 252.64 h0 M 55.25 284 h0 M 56.95 248.43 h0 M 58.65 300.55 h0 M 60.35 256.34 h0 M 62.06 166.93 h0 M 63.76 127.61 h0 M 65.46 205.19 h0 M 67.17 202.03 h0 M 68.87 263.29 h0 M 70.57 223.61 h0 M 72.27 249.35 h0 M 73.98 153.76 h0 M 75.68 213.28 h0 M 77.38 254.19 h0 M 79.09 282.35 h0 M 80.79 247.52 h0 M 82.49 226.35 h0 M 84.19 276.05 h0 M 85.9 263.29 h0 M 87.6 220.32 h0 M 89.3 241.07 h0 M 91.01 246.06 h0 M 92.71 291.5 h0 M 94.41 268.05 h0 M 96.11 260.64 h0 M 97.82 251.82 h0 M 99.52 215.93 h0 M 101.22 260.41 h0 M 102.93 286.47 h0 M 104.63 290.17 h0 M 106.33 262.19 h0 M 108.03 281.49 h0 M 109.74 235.31 h0 M 111.44 253.37 h0 M 113.14 257.85 h0 M 114.85 241.81 h0 M 116.55 248.75 h0 M 118.25 123.22 h0 M 119.95 286.74 h0 M 121.66 257.39 h0 M 123.36 216.53 h0 M 125.06 200.02 h0 M 126.77 196.59 h0 M 128.47 172.46 h0 M 130.17 252.46 h0 M 131.87 286.56 h0 M 133.58 212.73 h0 M 135.28 216.94 h0 M 136.98 255.29 h0 M 138.69 229.19 h0 M 140.39 215.34 h0 M 142.09 247.43 h0 M 143.79 140.14 h0 M 145.5 220.59 h0 M 147.2 252.27 h0 M 148.9 204.91 h0 M 150.61 275.27 h0 M 152.31 253.78 h0 M 154.01 250.26 h0 M 155.71 227.22 h0 M 157.42 127.98 h0 M 159.12 130.63 h0 M 160.82 260.18 h0 M 162.53 239.79 h0 M 164.23 175.47 h0 M 165.93 289.49 h0 M 167.63 106.95 h0 M 169.34 328.02 h0 M 171.04 148.32 h0 M 172.74 112.75 h0 M 174.45 153.99 h0 M 176.15 229.28 h0 M 177.85 172.78 h0 M 179.55 127.02 h0 M 181.26 240.75 h0 M 182.96 213.1 h0 M 184.66 282.26 h0 M 186.37 204.73 h0 M 188.07 252.23 h0 M 189.77 238.65 h0 M 191.47 97.03 h0 M 193.18 261.37 h0 M 194.88 247.79 h0 M 196.58 171.45 h0 M 198.29 225.81 h0 M 199.99 251.91 h0 M 201.69 168.53 h0 M 203.39 92.46 h0 M 205.1 154.86 h0 M 206.8 242.72 h0 M 208.5 200.34 h0 M 210.21 273.17 h0 M 211.91 254.83 h0 M 213.61 194.08 h0 M 215.31 220.59 h0 M 217.02 255.25 h0 M 218.72 138.03 h0 M 220.42 175.52 h0 M 222.13 224.02 h0 M 223.83 244.59 h0 M 225.53 156.46 h0 M 227.23 187.18 h0 M 228.94 312.57 h0 M 230.64 204.64 h0 M 232.34 192.75 h0 M 234.05 238.24 h0 M 235.75 165.05 h0 M 237.45 275.36 h0 M 239.15 264.85 h0 M 240.86 298.26 h0 M 242.56 268.27 h0 M 244.26 281.81 h0 M 245.97 196.41 h0 M 247.67 253.14 h0 M 249.37 248.75 h0 M 251.07 163.31 h0 M 252.78 242.17 h0 M 254.48 188.18 h0 M 256.18 261.14 h0 M 257.89 225.03 h0 M 259.59 229.55 h0 M 261.29 136.98 h0 M 262.99 266.63 h0 M 264.7 187.36 h0 M 266.4 156.27 h0 M 268.1 236.5 h0 M 269.81 107.09 h0 M 271.51 281.49 h0 M 273.21 229.74 h0 M 274.91 252.41 h0 M 276.62 235.86 h0 M 278.32 92.82 h0 M 280.02 148.14 h0 M 281.73 277.65 h0 M 283.43 155.5 h0 M 285.13 215.66 h0 M 286.83 247.02 h0 M 288.54 259.59 h0 M 290.24 278.01 h0 M 291.94 246.38 h0 M 293.65 240.71 h0 M 295.35 220.18 h0 M 297.05 149.14 h0 M 298.75 221.28 h0 M 300.46 269.01 h0 M 302.16 177.53 h0 M 303.86 270.15 h0 M 305.57 264.98 h0 M 307.27 268.27 h0 M 308.97 138.77 h0 M 310.67 263.02 h0 M 312.38 217.81 h0 M 314.08 291.63 h0 M 315.78 133.97 h0 M 317.49 273.85 h0 M 319.19 269.65 h0 M 320.89 237.87 h0 M 322.59 235.36 h0 M 324.3 232.11 h0 M 326 235.41 h0 M 327.7 164.37 h0 M 329.41 229.51 h0 M 331.11 200.89 h0 M 332.81 171.68 h0 M 334.51 162.45 h0 M 336.22 193.58 h0 M 337.92 276.78 h0 M 339.62 262.7 h0 M 341.33 225.62 h0 M 343.03 267.68 h0 M 344.73 248.94 h0 M 346.43 75.77 h0 M 348.14 238.51 h0 M 349.84 201.53 h0 M 351.54 264.07 h0 M 353.25 214.97 h0 M 354.95 232.71 h0 M 356.65 249.12 h0 M 358.35 243.82 h0 M 360.06 233.17 h0 M 361.76 211.18 h0 M 363.46 153.85 h0 M 365.17 259.95 h0 M 366.87 262.97 h0 M 368.57 279.38 h0 M 370.27 220.46 h0 M 371.98 215.11 h0 M 373.68 198.06 h0 M 375.38 273.67 h0 M 377.09 261.51 h0 M 378.79 182.29 h0 M 380.49 157.37 h0 M 382.19 197.01 h0 M 383.9 253.65 h0 M 385.6 249.35 h0 M 387.3 286.88 h0 M 389.01 254.88 h0 M 390.71 290.49 h0 M 392.41 241.53 h0 M 394.11 117.6 h0 M 395.82 170.72 h0 M 397.52 270.01 h0 M 399.22 219.73 h0 M 400.93 252.46 h0 M 402.63 164.73 h0 M 404.33 266.45 h0 M 406.03 240.62 h0 M 407.74 206.93 h0 M 409.44 274.22 h0 M 411.14 223.38 h0 M 412.85 274.03 h0 M 414.55 215.47 h0 M 416.25 247.79 h0 M 417.95 253.78 h0 M 419.66 272.89 h0 M 421.36 270.29 h0 M 423.06 252.55 h0 M 424.77 244.96 h0 M 426.47 222.97 h0 M 428.17 256.39 h0 M 429.87 165.42 h0 M 431.58 267.95 h0 M 433.28 238.29 h0 M 434.98 267.63 h0 M 436.69 201.99 h0 M 438.39 217.07 h0 M 440.09 254.42 h0 M 441.79 257.12 h0 M 443.5 294.19 h0 M 445.2 251.73 h0 M 446.9 295.61 h0 M 448.61 230.1 h0 M 450.31 248.3 h0 M 452.01 215.43 h0 M 453.71 246.83 h0 M 455.42 288.94 h0 M 457.12 275.27 h0 M 458.82 233.94 h0 M 460.53 177.76 h0 M 462.23 258.03 h0 M 463.93 203.13 h0 M 465.63 214.79 h0 M 467.34 156.91 h0 M 469.04 159.06 h0 M 470.74 261.37 h0 M 472.45 279.38 h0 M 474.15 155.5 h0 M 475.85 156.18 h0 M 477.55 285.97 h0 M 479.26 222.06 h0 M 480.96 247.34 h0 M 482.66 155.45 h0 M 484.37 246.93 h0 M 486.07 223.93 h0 M 487.77 221.55 h0 M 489.47 275.77 h0 M 491.18 250.63 h0 M 492.88 230.47 h0 M 494.58 227.45 h0 M 496.29 264.53 h0 M 497.99 187.59 h0 M 499.69 204.96 h0 M 501.39 200.34 h0 M 503.1 206.7 h0 M 504.8 187.04 h0 M 506.5 209.35 h0 M 508.21 200.39 h0 M 509.91 129.99 h0 M 511.61 226.77 h0 M 513.31 178.67 h0 M 515.02 225.71 h0 M 516.72 179.04 h0 M 518.42 166.29 h0 M 520.13 224.71 h0 M 521.83 256.89 h0 M 523.53 244.05 h0 M 525.23 238.33 h0 M 526.94 253.28 h0 M 528.64 129.3 h0 M 530.34 194.35 h0 M 532.05 172.32 h0 M 533.75 145.67 h0 M 535.45 217.21 h0 M 537.15 249.49 h0 M 538.86 275.36 h0 M 540.56 210.86 h0" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="4" stroke-linecap="round"/>
+<rect x="28" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x day --y margin --term svg --title 'Holdout margin per hotel-day' &lt; holdout.csv</code> <a href="data/holdout.csv">the table</a> <a href="gallery/real.svg">the svg</a></p>
+</figure>
+<figure id="text">
+<h3>The same chart as text</h3>
+<p><code>--term dumb</code> draws in characters: for a terminal, a log, or a test. The same table as the first chart, lines joined with integers only.</p>
+<pre>220 |                                    |                                +
+    |                                    |                      ++   +++++ +
+200 |                                    |                     +  +++
+    |                                    |                ++ ++          **
+180 |                                    |      +++ ++++ +  +   ** ******  *
+    |                                    |+     +  +    +*** ***  *
+160 |                                    + + +++      ***   *
+    |                                   +|**+ ********
+    |                               ++*+ |* **
+140 |                      *++ +++++**+ **
+    |              +*+** +++  +*****     |
+120 |       *** +++*+*+++                |
+    |** +*+++  +**                       |
+100 |+++*+   ++                          |
+    |  *                                 |
+ 80 |                                    |
+    +------------------------------------------------------------------------
+     0          10          20          30          40          50         60
+* control  + treated
+</pre>
+<p class="cmd"><code>plot --x day --y control,treated --with lines --term dumb --size 72x16 --vline 30 &lt; net.csv</code> <a href="data/net.csv">the table</a> <a href="gallery/text.txt">the text</a></p>
+</figure>
+</section>
+
+<h2>Ticks</h2>
+<p>The axis rule on its own: the 1-2-5 ticks of a range, written exactly.</p>
+<pre><code>$ plot ticks 0 1 5
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0
+
+$ plot ticks -3 7 4
+-2
+0
+2
+4
+6
+
+$ plot ticks 0.001 0.0073
+0.001
+0.002
+0.003
+0.004
+0.005
+0.006
+0.007
+
+$ plot ticks 0 1000000
+0
+200000
+400000
+600000
+800000
+1000000
+</code></pre>
+
+<h2>What is there, and what is not</h2>
+<p>Built: points and lines, up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Not built yet: bars, histograms, error bars, a gnuplot-like script, PNG. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+
+<footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
+</main>
+</body>
+</html>
