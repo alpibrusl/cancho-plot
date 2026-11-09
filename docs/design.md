@@ -353,3 +353,21 @@ string, which a plain string cannot hold (the check was removed: dead code). The
 by `check_site.py`, which draws them again every time.
 
 **Not yet:** histograms from `stats describe` edges and counts (slice c), `--logy`, horizontal bars, a key with a dot, several documents.
+
+## 25. Slice 5c: histograms from edges and counts [choice, before the code]
+
+    plot --x LO --xhi HI --y COUNT[,COUNT..] --with hist ...
+    stats describe --bins N --cols C FILE | plot --json data.columns.0.histogram --x lo --xhi hi --y count --with hist
+
+**What `stats` prints** (measured, `stats describe --bins 10 --cols x1,x2` on a 300-row table): per column `histogram {"bins": N, "edges": [N+1 numbers], "counts": [N integers]}`, not an array of objects. So the JSON reader learns a third shape (C): an object with arrays
+`edges` and `counts`, `len(edges) = len(counts) + 1`, is read as N rows with the columns `lo` (edges[i]), `hi` (edges[i+1]) and `count` (counts[i]). Anything else with those keys is `plot.json-path`.
+
+**The chart.** One bar for each row, from `--x` (its lower edge) to `--xhi` (its upper edge) on a numeric x axis, at the height of each `--y` series (normally one); the y range includes 0; the x range is the lowest lower edge to the highest upper one, with the ticks of section 10. More than one series are drawn in order,
+a later over an earlier; in `svg` with `fill-opacity="0.6"` when there are two or more. `--yerr`, `--ylo`, `--yhi` and `--categories` with `hist` are `plot.usage`. A row whose upper edge is not above its lower edge is `plot.range-invalid`; the bars may leave gaps between them.
+
+**`dumb`.** For a bin from `lo` to `hi`: t(v) = (v - xlo) * W / (xhi - xlo) + 1e-9, the columns are from c0 = floor(t(lo)) up to but not including c1 = floor(t(hi)), both clamped to the width (so the last edge ends at W), and c1 is at least c0 + 1; when it spans 3 columns or more the last is left empty, so two bins can be told apart. The rows are
+those of the bars of section 20: from the row of the value to the row of 0, both included, with the glyph of the series.
+
+**`svg`.** Bin i is `<rect x="X(lo)" y="min(Y(v), Y(0))" width="X(hi) - X(lo) - g" height="|Y(0) - Y(v)|" fill="var(--series-J, #HEX)"/>` with g = 1 when X(hi) - X(lo) > 3 and 0 otherwise (doubles, section 13's formulas), after the annotations, in place of the series paths.
+
+**Gate.** `cancho test`, hand-worked: three bins in both terminals, a bin of one column, two series, every refusal, the JSON shape C (with the real document of `stats` as test data); then the mutant measurement as in sections 18 and 24.
