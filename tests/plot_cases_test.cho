@@ -30,7 +30,7 @@ fn chart_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: 
         ac[1] = nh;
         ac[2] = nb;
         ac[3] = diag;
-        let (code, line, chart) = chart.draw(heap, table, "x", ycols, "", "", w, hh, title, has_title, lines, false, ann, ac);
+        let (code, line, chart) = chart.draw(heap, table, "x", ycols, "", "", "", w, hh, title, has_title, lines, false, ann, ac);
         test.assert(code == 0);
         buffer.drop(heap, out);
         out = chart;

@@ -99,13 +99,24 @@ pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, an
         }
         i = i + 1;
     }
-    // bars start at 0 (section 20)
-    if ac[4] == 1 {
+    // bars and histogram bars start at 0 (sections 20 and 25)
+    if ac[4] >= 1 {
         if ylo > 0.0 {
             ylo = 0.0;
         }
         if yhi < 0.0 {
             yhi = 0.0;
+        }
+    }
+    // a histogram's x range runs to the highest upper edge, which follows the error columns in ys
+    if ac[4] == 2 {
+        i = 0;
+        while i < n {
+            let hi = ys[(k + 2 * ac[5]) * n + i];
+            if hi > xhi {
+                xhi = hi;
+            }
+            i = i + 1;
         }
     }
     // error bars: value - down and value + up (after the k series, ys holds the ke columns of `down` and then the ke of `up`)

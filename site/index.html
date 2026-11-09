@@ -562,6 +562,73 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 </div>
 <p class="cmd"><code>plot --json data.results --x fold --y metrics.roc_auc,metrics.accuracy --with bars --term svg --title 'ml cv: metrics by fold' &lt; ml-cv.json</code> <a href="data/ml-cv.json">the table</a> <a href="gallery/jsoncv.svg">the svg</a></p>
 </figure>
+<figure id="jsonhist">
+<h3>A histogram from stats describe</h3>
+<p>The document <code>stats describe --bins 10</code> printed: a column's <code>histogram</code> is N counts between N + 1 edges, and the reader makes it the table <code>lo</code>, <code>hi</code>, <code>count</code>; <code>--with hist --x lo --xhi hi</code> draws each bin from its lower to its upper edge.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="stats describe: x1 in 10 bins: 1 series, 10 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 28 36 V 356 H 624"/>
+<path d="M 28 356 h-4"/>
+<path d="M 28 276 h-4"/>
+<path d="M 28 196 h-4"/>
+<path d="M 28 116 h-4"/>
+<path d="M 28 36 h-4"/>
+<path d="M 28 356 v4"/>
+<path d="M 147.2 356 v4"/>
+<path d="M 266.4 356 v4"/>
+<path d="M 385.6 356 v4"/>
+<path d="M 504.8 356 v4"/>
+<path d="M 624 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">stats describe: x1 in 10 bins</text>
+<text x="20" y="360" text-anchor="end">0</text>
+<text x="20" y="280" text-anchor="end">10</text>
+<text x="20" y="200" text-anchor="end">20</text>
+<text x="20" y="120" text-anchor="end">30</text>
+<text x="20" y="40" text-anchor="end">40</text>
+<text x="28" y="374" text-anchor="middle">0.0</text>
+<text x="147.2" y="374" text-anchor="middle">0.2</text>
+<text x="266.4" y="374" text-anchor="middle">0.4</text>
+<text x="385.6" y="374" text-anchor="middle">0.6</text>
+<text x="504.8" y="374" text-anchor="middle">0.8</text>
+<text x="624" y="374" text-anchor="middle">1.0</text>
+<text x="42" y="392">count</text>
+</g>
+<rect x="28" y="188" width="58.12" height="168" fill="var(--series-1, #0550ae)"/>
+<rect x="87.12" y="100" width="58.12" height="256" fill="var(--series-1, #0550ae)"/>
+<rect x="146.25" y="116" width="58.12" height="240" fill="var(--series-1, #0550ae)"/>
+<rect x="205.37" y="132" width="58.12" height="224" fill="var(--series-1, #0550ae)"/>
+<rect x="264.49" y="76" width="58.12" height="280" fill="var(--series-1, #0550ae)"/>
+<rect x="323.62" y="52" width="58.12" height="304" fill="var(--series-1, #0550ae)"/>
+<rect x="382.74" y="140" width="58.12" height="216" fill="var(--series-1, #0550ae)"/>
+<rect x="441.86" y="76" width="58.12" height="280" fill="var(--series-1, #0550ae)"/>
+<rect x="500.99" y="140" width="58.12" height="216" fill="var(--series-1, #0550ae)"/>
+<rect x="560.11" y="140" width="58.12" height="216" fill="var(--series-1, #0550ae)"/>
+<rect x="28" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --json data.columns.0.histogram --x lo --xhi hi --y count --with hist --term svg --title 'stats describe: x1 in 10 bins' &lt; stats-describe.json</code> <a href="data/stats-describe.json">the table</a> <a href="gallery/jsonhist.svg">the svg</a></p>
+</figure>
+<figure id="histtext">
+<h3>The same histogram as text</h3>
+<p>A bin three columns wide or more leaves its last column empty, so neighbours can be told apart.</p>
+<pre>40 |                             *****
+   |                       ***** *****       *****
+30 |     ***** *****       ***** *****       *****
+   |     ***** ***** ***** ***** ***** ***** ***** ***** *****
+   |**** ***** ***** ***** ***** ***** ***** ***** ***** *****
+20 |**** ***** ***** ***** ***** ***** ***** ***** ***** *****
+   |**** ***** ***** ***** ***** ***** ***** ***** ***** *****
+10 |**** ***** ***** ***** ***** ***** ***** ***** ***** *****
+   |**** ***** ***** ***** ***** ***** ***** ***** ***** *****
+ 0 |**** ***** ***** ***** ***** ***** ***** ***** ***** *****
+   +------------------------------------------------------------
+    0.0        0.2         0.4         0.6         0.8       1.0
+* count
+</pre>
+<p class="cmd"><code>plot --json data.columns.0.histogram --x lo --xhi hi --y count --with hist --term dumb --size 60x10 &lt; stats-describe.json</code> <a href="data/stats-describe.json">the table</a> <a href="gallery/histtext.txt">the text</a></p>
+</figure>
 <figure id="barstext">
 <h3>Bars as text</h3>
 <p>The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.</p>
@@ -646,7 +713,7 @@ $ plot ticks 0 1000000
 </code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Not built yet: histograms, box plots, heatmaps, ROC and other curves, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Not built yet: box plots, heatmaps, ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

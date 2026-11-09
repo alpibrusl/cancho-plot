@@ -53,6 +53,18 @@ fn flush[&h](heap: &!h Heap, out: buffer.Buffer, line: buffer.Buffer) -> [heap] 
     return buffer.push(heap, o, byte_of(10));
 }
 
+// the column an edge falls in, from 0 to w (section 25)
+fn edgecol(v: float, xlo: float, xhi: float, w: int) -> [] int {
+    var c = truncate((v - xlo) * float_of(w) / (xhi - xlo) + 1.0e-9);
+    if c < 0 {
+        c = 0;
+    }
+    if c > w {
+        c = w;
+    }
+    return c;
+}
+
 // the middle column of the slot of category i, where a point of a category chart goes (section 23)
 fn center(w: int, n: int, i: int) -> [] int {
     let s0 = i * w / n;
@@ -184,7 +196,45 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
             put_whiskers(grid, xs, ys, n, k, ac[5], false, ac[7] == 1, w, hh, xlo2, xhi2, ylo2, yhi2);
         }
         var j = 0;
-        if ac[4] == 1 {
+        if ac[4] == 2 {
+            // a histogram (section 25): a bin from its lower to its upper edge, the last column left empty when it spans three or more
+            let rz = rowcell(0.0, ylo2, yhi2, hh);
+            while j < k {
+                var bi = 0;
+                while bi < n {
+                    var c0 = edgecol(xs[bi], xlo2, xhi2, w);
+                    if c0 > w - 1 {
+                        c0 = w - 1;
+                    }
+                    var c1 = edgecol(ys[(k + 2 * ac[5]) * n + bi], xlo2, xhi2, w);
+                    if c1 <= c0 {
+                        c1 = c0 + 1;
+                    }
+                    var last = c1 - 1;
+                    if c1 - c0 >= 3 {
+                        last = c1 - 2;
+                    }
+                    let rv = rowcell(ys[j * n + bi], ylo2, yhi2, hh);
+                    var top = rz;
+                    var bot = rv;
+                    if rv < rz {
+                        top = rv;
+                        bot = rz;
+                    }
+                    var rr = top;
+                    while rr <= bot {
+                        var cc = c0;
+                        while cc <= last {
+                            grid[rr * w + cc] = glyphs[j];
+                            cc = cc + 1;
+                        }
+                        rr = rr + 1;
+                    }
+                    bi = bi + 1;
+                }
+                j = j + 1;
+            }
+        } else if ac[4] == 1 {
             // bars (section 20): from the row of 0 to the row of the value, the rows of both included
             let rz = rowcell(0.0, ylo2, yhi2, hh);
             var ci = 0;

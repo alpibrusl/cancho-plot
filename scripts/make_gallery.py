@@ -89,6 +89,12 @@ GALLERY = [
     ("jsoncv", "Cross-validation folds from ml cv",
      "The document <code>ml cv</code> printed, one row for each fold in <code>data.results</code>; two metrics are nested fields (<code>metrics.roc_auc</code>, <code>metrics.accuracy</code>), the fold number is the category.",
      "ml-cv.json", ["--json", "data.results", "--x", "fold", "--y", "metrics.roc_auc,metrics.accuracy", "--with", "bars", "--term", "svg", "--title", "ml cv: metrics by fold"], "svg"),
+    ("jsonhist", "A histogram from stats describe",
+     "The document <code>stats describe --bins 10</code> printed: a column's <code>histogram</code> is N counts between N + 1 edges, and the reader makes it the table <code>lo</code>, <code>hi</code>, <code>count</code>; <code>--with hist --x lo --xhi hi</code> draws each bin from its lower to its upper edge.",
+     "stats-describe.json", ["--json", "data.columns.0.histogram", "--x", "lo", "--xhi", "hi", "--y", "count", "--with", "hist", "--term", "svg", "--title", "stats describe: x1 in 10 bins"], "svg"),
+    ("histtext", "The same histogram as text",
+     "A bin three columns wide or more leaves its last column empty, so neighbours can be told apart.",
+     "stats-describe.json", ["--json", "data.columns.0.histogram", "--x", "lo", "--xhi", "hi", "--y", "count", "--with", "hist", "--term", "dumb", "--size", "60x10"], "txt"),
     ("barstext", "Bars as text",
      "The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.",
      "importance.csv", ["--x", "feature", "--y", "importance", "--with", "bars", "--yerr", "std", "--term", "dumb", "--size", "56x12"], "txt"),
@@ -117,7 +123,7 @@ def build(out):
     for name, text in datasets().items():
         open(os.path.join(out, "data", name), "w").write(text)
     if os.path.abspath(out) != os.path.abspath(SITE):
-        for kept in ("holdout.csv", "ml-importance.json", "stats-t2.json", "ml-cv.json"):      # real data, not made here
+        for kept in ("holdout.csv", "ml-importance.json", "stats-t2.json", "ml-cv.json", "stats-describe.json"):      # real data, not made here
             shutil.copy(os.path.join(SITE, "data", kept), os.path.join(out, "data", kept))
     cards = []
     for gid, title, text, data, args, kind in GALLERY:
@@ -203,7 +209,7 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 <pre><code>@TICKS@</code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Not built yet: histograms, box plots, heatmaps, ROC and other curves, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Not built yet: box plots, heatmaps, ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

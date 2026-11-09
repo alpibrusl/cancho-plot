@@ -371,3 +371,17 @@ those of the bars of section 20: from the row of the value to the row of 0, both
 **`svg`.** Bin i is `<rect x="X(lo)" y="min(Y(v), Y(0))" width="X(hi) - X(lo) - g" height="|Y(0) - Y(v)|" fill="var(--series-J, #HEX)"/>` with g = 1 when X(hi) - X(lo) > 3 and 0 otherwise (doubles, section 13's formulas), after the annotations, in place of the series paths.
 
 **Gate.** `cancho test`, hand-worked: three bins in both terminals, a bin of one column, two series, every refusal, the JSON shape C (with the real document of `stats` as test data); then the mutant measurement as in sections 18 and 24.
+
+## 26. Slice 5c, built [measured]
+
+`--with hist` with `--xhi` (section 25), in both terminals, and the third JSON shape (an object with `edges` and `counts`: the columns `lo`, `hi`, `count`). `axis.extent` takes the x range to the highest upper edge, which `chart.draw` stores after the error columns in `ys`.
+**No Python added.** `chart.draw` took one more argument (`xhi`), so the tests' calls changed; the Python gates were not touched and still pass.
+
+**Real document.** `stats describe --bins 10 --cols x1,x2` on the 300-row table is `site/data/stats-describe.json`; the gallery draws its first column's histogram as svg and as text straight from it (`--json data.columns.0.histogram --x lo --xhi hi --y count --with hist`).
+
+**Tests and measure.** 64 + 21 `cancho test` cases now; the histogram ones are worked out by hand: three bins (with the 3-column bin that leaves its last column empty), a bin narrower than a column, the svg rects (`X(v) = 20 + 151 v`), two series, a bin 3.5 pixels wide, every refusal, the JSON shape with
+the real histogram, and three cases the mutants asked for: an edge that a float puts under its column (0.29 * 100 is 28.999999999999996, so the edge is column 29 only with the slack), a lower edge a billionth of a column from the end, and a baseline one row off. Mutants of the new code against the tests alone: 31; the first tests killed 24, with a test for each survivor 29, and 2 are
+equivalent: the `kh > 0` of the refusal for a histogram with intervals (the checks before it already refuse `--ylo`/`--yhi` without a matching `--yerr`, so it cannot be the only one that fires) and `edges >= 0 && counts >= 0` to `||` in the reader (an object with only one of them is refused as not rows either way).
+Left out as equivalent without a test: the index `2 * ac[5]` of the upper edges, which is 0 for a histogram (it takes no intervals).
+
+**Not yet:** box plots and heatmaps (the rest of slice c, a design of their own), the curves computed by `plot` (ROC, empirical CDF, Q-Q), `--logy`, `--by`, horizontal bars.

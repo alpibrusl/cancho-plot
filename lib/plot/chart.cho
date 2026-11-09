@@ -27,7 +27,7 @@ fn has_control[&t](text: &t [byte]) -> [] bool {
 }
 
 // Read the table in `text` and draw it: x from the column `xspec`, the series from the columns of the comma-separated `yspec`. Answers (code, line, chart): `line` is the line of the table the code is about (from 1).
-pub fn draw[&h, &t, &x, &y, &q, &q2, &z, &e, &f](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], yerr: &q [byte], yhi: &q2 [byte], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, svg_term: bool, ann: &e [float], ac: &!f [int]) -> [heap] (int, int, buffer.Buffer) {
+pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], yerr: &q [byte], yhi: &q2 [byte], xhi: &q3 [byte], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, svg_term: bool, ann: &e [float], ac: &!f [int]) -> [heap] (int, int, buffer.Buffer) {
     let none = buffer.empty(heap, 1);
     if len(text) == 0 {
         return (4, 0, none);
@@ -84,6 +84,13 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &z, &e, &f](heap: &!h Heap, text: &t [byte]
     if ac[6] != 1 && kh > 0 {
         return (11, 0, none);
     }
+    // a histogram (section 25) takes the column of the upper edges and nothing else of the intervals or the categories
+    if ac[4] == 2 && (len(xhi) == 0 || ke > 0 || kh > 0 || ac[7] == 1) {
+        return (11, 0, none);
+    }
+    if ac[4] != 2 && len(xhi) > 0 {
+        return (11, 0, none);
+    }
     ac[5] = ke;
     var xcol = csv.column(text, 0, hend, xspec);
     var ycols = 0 - 1;
@@ -94,6 +101,13 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &z, &e, &f](heap: &!h Heap, text: &t [byte]
         let yc = alloc_slice[r](5, 0);
         let ec = alloc_slice[r](5, 0);
         let eh = alloc_slice[r](5, 0);
+        var hcol = 0 - 1;
+        if ac[4] == 2 {
+            hcol = csv.column(text, 0, hend, xhi);
+            if hcol < 0 {
+                code = 5;
+            }
+        }
         let ns = alloc_slice[r](5, 0);
         let ne = alloc_slice[r](5, 0);
         var from = 0;
@@ -169,7 +183,11 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &z, &e, &f](heap: &!h Heap, text: &t [byte]
         if code == 0 {
             let ncols = csv.cells(text, 0, hend);
             let xsb = box_slice(heap, n, 0.0);
-            let ysb = box_slice(heap, n * (ycount + 2 * ke), 0.0);
+            var extra = 0;
+            if ac[4] == 2 {
+                extra = 1;
+            }
+            let ysb = box_slice(heap, n * (ycount + 2 * ke + extra), 0.0);
             let clb = box_slice(heap, 2 * n, 0);
             borrow mut xsb as &!xw in {
                 borrow mut ysb as &!yw in {
@@ -201,6 +219,20 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &z, &e, &f](heap: &!h Heap, text: &t [byte]
                                         line = row + 2;
                                     } else {
                                         xs[row] = v;
+                                    }
+                                }
+                                if ac[4] == 2 && code == 0 {
+                                    // the upper edge of the bin, after the columns of the series and of the errors
+                                    let (c3, d3) = csv.cell(text, at, end, hcol);
+                                    let (ok5, v5) = num.number(text[c3..d3]);
+                                    if !ok5 {
+                                        code = 2;
+                                        line = row + 2;
+                                    } else if v5 <= xs[row] {
+                                        code = 7;
+                                        line = row + 2;
+                                    } else {
+                                        ys[(ycount + 2 * ke) * n + row] = v5;
                                     }
                                 }
                                 var q = 0;

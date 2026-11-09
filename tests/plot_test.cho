@@ -315,7 +315,7 @@ fn code_of[&h, &t](heap: &!h Heap, text: &t [byte], xspec: &static [byte], yspec
     region r {
         let ann = alloc_slice[r](24, 0.0);
         let ac = alloc_slice[r](8, 0);
-        let (c, l, out) = chart.draw(heap, text, xspec, yspec, "", "", 20, 8, title, has_title, false, false, ann, ac);
+        let (c, l, out) = chart.draw(heap, text, xspec, yspec, "", "", "", 20, 8, title, has_title, false, false, ann, ac);
         buffer.drop(heap, out);
         code = c;
         line = l;
@@ -397,7 +397,7 @@ fn code_of_buffer[&h](heap: &!h Heap, text: buffer.Buffer, ycols: &static [byte]
         let ann = alloc_slice[r](24, 0.0);
         let ac = alloc_slice[r](8, 0);
         borrow text as &tb in {
-            let (c, l, out) = chart.draw(heap, buffer.bytes(tb), "x", ycols, "", "", 20, 8, "", false, false, false, ann, ac);
+            let (c, l, out) = chart.draw(heap, buffer.bytes(tb), "x", ycols, "", "", "", 20, 8, "", false, false, false, ann, ac);
             buffer.drop(heap, out);
             code = c;
         }
@@ -433,7 +433,7 @@ fn title_code[&h](heap: &!h Heap, middle: int) -> [heap] int {
         let ann = alloc_slice[r](24, 0.0);
         let ac = alloc_slice[r](8, 0);
         borrow title as &tb in {
-            let (c, l, out) = chart.draw(heap, "x,y\n1,2\n3,4\n", "x", "y", "", "", 20, 8, buffer.bytes(tb), true, false, false, ann, ac);
+            let (c, l, out) = chart.draw(heap, "x,y\n1,2\n3,4\n", "x", "y", "", "", "", 20, 8, buffer.bytes(tb), true, false, false, ann, ac);
             buffer.drop(heap, out);
             code = c;
         }
@@ -461,7 +461,7 @@ fn svg_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: in
     region r {
         let ann = alloc_slice[r](24, 0.0);
         let ac = alloc_slice[r](8, 0);
-        let (c, l, chart) = chart.draw(heap, table, "x", ycols, "", "", w, hh, title, has_title, lines, true, ann, ac);
+        let (c, l, chart) = chart.draw(heap, table, "x", ycols, "", "", "", w, hh, title, has_title, lines, true, ann, ac);
         code = c;
         buffer.drop(heap, out);
         out = chart;
@@ -558,7 +558,7 @@ fn svg_diag[&h, &t](heap: &!h Heap, table: &t [byte]) -> [heap] buffer.Buffer {
         let ann = alloc_slice[r](24, 0.0);
         let ac = alloc_slice[r](8, 0);
         ac[3] = 1;
-        let (c, l, chart) = chart.draw(heap, table, "x", "y", "", "", 640, 400, "", false, false, true, ann, ac);
+        let (c, l, chart) = chart.draw(heap, table, "x", "y", "", "", "", 640, 400, "", false, false, true, ann, ac);
         test.assert(c == 0);
         buffer.drop(heap, out);
         out = chart;
@@ -609,7 +609,7 @@ fn drawn[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], yerr: 
         if bars {
             ac[4] = 1;
         }
-        let (c, l, chart) = chart.draw(heap, table, "x", ycols, yerr, "", w, hh, "", false, false, svg_term, ann, ac);
+        let (c, l, chart) = chart.draw(heap, table, "x", ycols, yerr, "", "", w, hh, "", false, false, svg_term, ann, ac);
         code = c;
         buffer.drop(heap, out);
         out = chart;
@@ -825,7 +825,7 @@ fn drawn_ext[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], yl
         if len(yhigh) > 0 {
             ac[6] = 1;
         }
-        let (c, l, chart) = chart.draw(heap, table, "x", ycols, ylow, yhigh, w, hh, "", false, false, svg_term, ann, ac);
+        let (c, l, chart) = chart.draw(heap, table, "x", ycols, ylow, yhigh, "", w, hh, "", false, false, svg_term, ann, ac);
         code = c;
         buffer.drop(heap, out);
         out = chart;
@@ -1075,7 +1075,7 @@ fn test_yhi_alone[&h](heap: &!h Heap) -> [heap] int {
     region r {
         let ann = alloc_slice[r](24, 0.0);
         let ac = alloc_slice[r](8, 0);
-        let (c, l, chart) = chart.draw(heap, "x,y,h\n0,1,2\n", "x", "y", "", "h", 20, 8, "", false, false, false, ann, ac);
+        let (c, l, chart) = chart.draw(heap, "x,y,h\n0,1,2\n", "x", "y", "", "h", "", 20, 8, "", false, false, false, ann, ac);
         code = c;
         buffer.drop(heap, chart);
     }
@@ -1091,7 +1091,7 @@ fn drawn_cat[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], ye
         let ann = alloc_slice[r](24, 0.0);
         let ac = alloc_slice[r](8, 0);
         ac[7] = 1;
-        let (c, l, chart) = chart.draw(heap, table, "x", ycols, yerr, "", w, hh, "", false, lines, false, ann, ac);
+        let (c, l, chart) = chart.draw(heap, table, "x", ycols, yerr, "", "", w, hh, "", false, lines, false, ann, ac);
         code = c;
         buffer.drop(heap, out);
         out = chart;
@@ -1110,5 +1110,187 @@ fn test_dumb_categories_error_bars[&h](heap: &!h Heap) -> [heap] int {
     let (code, doc) = drawn_cat(heap, "x,y,e\nA,1,0.5\nB,2,0.5\n", "y", "e", 10, 5, false);
     test.assert(code == 0);
     same(heap, doc, "2.5 |       |\n2.0 |       *\n1.5 |  |    |\n1.0 |  *\n0.5 |  |\n    +----------\n       A    B\n* y\n");
+    return 0;
+}
+
+// ---- histograms (section 25): every chart worked out by hand ------------------------------------------------------------------------------------------------
+
+// the chart of a table whose columns are the lower edge (x), the series, and `xhi` the upper edge
+fn drawn_hist[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], xhi: &static [byte], yerr: &static [byte], w: int, hh: int, svg_term: bool, cat: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 1);
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        ac[4] = 2;
+        if cat {
+            ac[7] = 1;
+        }
+        let (c, l, chart) = chart.draw(heap, table, "lo", ycols, yerr, "", xhi, w, hh, "", false, false, svg_term, ann, ac);
+        code = c;
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return (code, out);
+}
+
+// three bins, [0,1) [1,2) [2,4]: bins of 3 columns or more leave their last empty, so they are told apart; the last edge ends at the width
+fn test_dumb_histogram[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,c\n0,1,2\n1,2,4\n2,4,3\n", "c", "hi", "", 12, 6, false, false);
+    test.assert(code == 0);
+    same(heap, doc, "4 |   **\n3 |   ** *****\n  |   ** *****\n2 |** ** *****\n1 |** ** *****\n0 |** ** *****\n  +------------\n   0.0  2.0 3.5\n* c\n");
+    return 0;
+}
+
+// a bin narrower than a column is one column
+fn test_dumb_histogram_thin_bin[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,c\n0,0.01,1\n1,4,2\n", "c", "hi", "", 12, 5, false, false);
+    test.assert(code == 0);
+    same(heap, doc, "2.0 |   ********\n1.5 |   ********\n1.0 |*  ********\n0.5 |*  ********\n0.0 |*  ********\n    +------------\n     0.0  2.0 3.5\n* c\n");
+    return 0;
+}
+
+// the same in svg: X(v) = 20 + 151 v, a pixel off the width of a bin wider than 3
+fn test_svg_histogram[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,c\n0,1,2\n1,2,4\n2,4,3\n", "c", "hi", "", 640, 400, true, false);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "<rect x=\"20\" y=\"184\" width=\"150\" height=\"172\" fill=\"var(--series-1, #0550ae)\"/>\n<rect x=\"171\" y=\"12\" width=\"150\" height=\"344\" fill=\"var(--series-1, #0550ae)\"/>\n<rect x=\"322\" y=\"98\" width=\"301\" height=\"258\" fill=\"var(--series-1, #0550ae)\"/>\n"));
+        test.assert(!has(t, "fill-opacity=\"0.6\""));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// two series are drawn translucent; a bin of 3 pixels or less keeps its width
+fn test_svg_histogram_two_series[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,a,b\n0,1,1,2\n1,2,2,1\n", "a,b", "hi", "", 640, 400, true, false);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.6\"/>\n"));
+        test.assert(has(t, "fill=\"var(--series-2, #bc4c00)\" fill-opacity=\"0.6\"/>\n"));
+    }
+    buffer.drop(heap, doc);
+    let (c2, d2) = drawn_hist(heap, "lo,hi,c\n0,1,1\n1,1.004,2\n", "c", "hi", "", 640, 400, true, false);
+    test.assert(c2 == 0);
+    borrow d2 as &d2b in {
+        test.assert(has(buffer.bytes(d2b), "width=\"1.96\" "));
+    }
+    buffer.drop(heap, d2);
+    return 0;
+}
+
+fn test_histogram_refusals[&h](heap: &!h Heap) -> [heap] int {
+    let t = "lo,hi,c\n0,1,2\n1,2,4\n";
+    let (a, da) = drawn_hist(heap, t, "c", "", "", 20, 8, false, false);
+    test.assert(a == 11);
+    buffer.drop(heap, da);
+    let (b, db) = drawn_hist(heap, t, "c", "hi", "c", 20, 8, false, false);
+    test.assert(b == 11);
+    buffer.drop(heap, db);
+    let (c, dc) = drawn_hist(heap, t, "c", "hi", "", 20, 8, false, true);
+    test.assert(c == 11);
+    buffer.drop(heap, dc);
+    let (d, dd) = drawn_hist(heap, t, "c", "q", "", 20, 8, false, false);
+    test.assert(d == 5);
+    buffer.drop(heap, dd);
+    let (e, de) = drawn_hist(heap, "lo,hi,c\n0,1,2\n1,1,4\n", "c", "hi", "", 20, 8, false, false);
+    test.assert(e == 7);
+    buffer.drop(heap, de);
+    let (f, df) = drawn_hist(heap, "lo,hi,c\n0,x,2\n", "c", "hi", "", 20, 8, false, false);
+    test.assert(f == 2);
+    buffer.drop(heap, df);
+    // --xhi without a histogram
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        let (g, l, chart) = chart.draw(heap, t, "lo", "c", "", "", "hi", 20, 8, "", false, false, false, ann, ac);
+        code = g;
+        buffer.drop(heap, chart);
+    }
+    test.assert(code == 11);
+    return 0;
+}
+
+// the shape stats describe prints: N counts between N + 1 edges
+fn test_json_histogram[&h](heap: &!h Heap) -> [heap] int {
+    let (c, r, t) = csv_of(heap, "{\"data\":{\"h\":{\"bins\":3,\"edges\":[0,1,2,4],\"counts\":[2,4,3]}}}", "data.h", "lo,hi,count");
+    test.assert(c == 0);
+    same(heap, t, "lo,hi,count\n0,1,2\n1,2,4\n2,4,3\n");
+    let (c2, r2, t2) = csv_of(heap, "{\"edges\":[0,1],\"counts\":[1,2]}", ".", "lo");
+    test.assert(c2 == 13);
+    buffer.drop(heap, t2);
+    let (c3, r3, t3) = csv_of(heap, "{\"edges\":[0,1,2],\"counts\":[1,2]}", ".", "x");
+    test.assert(c3 == 14);
+    buffer.drop(heap, t3);
+    let (c4, r4, t4) = csv_of(heap, "{\"edges\":5,\"counts\":[1,2]}", ".", "lo");
+    test.assert(c4 == 13);
+    buffer.drop(heap, t4);
+    // the real document of stats describe, a column's histogram
+    let (c5, r5, t5) = csv_of(heap, "{\"ok\":true,\"data\":{\"columns\":[{\"name\":\"x1\",\"histogram\":{\"bins\":3,\"edges\":[0.0,0.331,0.662,0.992],\"counts\":[96,102,102]}}]}}", "data.columns.0.histogram", "lo,hi,count");
+    test.assert(c5 == 0);
+    same(heap, t5, "lo,hi,count\n0.0,0.331,96\n0.331,0.662,102\n0.662,0.992,102\n");
+    return 0;
+}
+
+// what the mutants of the histogram asked for: an edge that a float puts just under its column, an edge that falls past the last column, a baseline a row off, a bin a few pixels wide, a lone --xhi
+
+// 0.29 * 100 is 28.999999999999996 in a float: the edge is column 29 all the same, so the first bin ends at 28 columns and the second starts at 29
+fn test_dumb_histogram_edge_trap[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,c\n0,0.29,1\n0.29,1,1\n", "c", "hi", "", 100, 5, false, false);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        test.assert(has(buffer.bytes(db), "|**************************** **********************************************************************\n"));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// a lower edge within a billionth of a column of the end is the last column
+fn test_dumb_histogram_edge_at_the_end[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,c\n0,3.9999999999,1\n3.9999999999,4,2\n", "c", "hi", "", 12, 5, false, false);
+    test.assert(code == 0);
+    same(heap, doc, "2.0 |           *\n1.5 |           *\n1.0 |************\n0.5 |************\n0.0 |************\n    +------------\n     0.0  2.0 3.5\n* c\n");
+    return 0;
+}
+
+// a bin of 1 from 0: 20 rows of 9 columns, and the glyph once more in the legend
+fn test_dumb_histogram_reaches_the_baseline[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,c\n0,1,1\n", "c", "hi", "", 10, 20, false, false);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        test.assert(count(buffer.bytes(db), "*") == 181);
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// a bin 3.5 pixels wide loses one: X = 36 + 147 v, so a bin of 0.0238095238 is 3.5
+fn test_svg_histogram_narrow_bin[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_hist(heap, "lo,hi,c\n0,2,1\n2,2.0238095238,2\n2.0238095238,4,1\n", "c", "hi", "", 640, 400, true, false);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "width=\"2.5\" "));
+        test.assert(!has(t, "width=\"3.5\" "));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// --xhi is only for a histogram, even a one-character column name
+fn test_xhi_without_a_histogram[&h](heap: &!h Heap) -> [heap] int {
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        let (g, l, chart) = chart.draw(heap, "lo,h,c\n0,1,2\n", "lo", "c", "", "", "h", 20, 8, "", false, false, false, ann, ac);
+        code = g;
+        buffer.drop(heap, chart);
+    }
+    test.assert(code == 11);
     return 0;
 }

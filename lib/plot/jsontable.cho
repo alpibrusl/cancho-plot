@@ -3,6 +3,7 @@ edition 9;
 module plot.jsontable;
 
 import std.buffer;
+import std.bytes;
 import std.json;
 
 // A JSON document as the table the other forms read (docs/design.md section 23). The codes: 0 done; 12 not JSON; 13 a path that is not there or does not lead to rows; 14 a field that a row lacks (or null);
@@ -111,12 +112,25 @@ pub fn to_csv[&h, &s, &p, &f](heap: &!h Heap, doc: &s [byte], path: &p [byte], f
             var rows_node = target;
             var cols_node = 0 - 1;
             var form_b = false;
+            var form_c = false;
             if target >= 0 && json.is_object(tape, target) {
-                cols_node = json.get(doc, tape, target, "columns");
-                rows_node = json.get(doc, tape, target, "rows");
-                form_b = true;
-                if cols_node < 0 || rows_node < 0 || !json.is_array(tape, cols_node) {
-                    code = 13;
+                let edges = json.get(doc, tape, target, "edges");
+                let counts = json.get(doc, tape, target, "counts");
+                if edges >= 0 && counts >= 0 {
+                    // a histogram, as stats describe prints it: N counts between N + 1 edges (section 25)
+                    form_c = true;
+                    cols_node = edges;
+                    rows_node = counts;
+                    if !json.is_array(tape, edges) || !json.is_array(tape, counts) || json.count(tape, edges) != json.count(tape, counts) + 1 {
+                        code = 13;
+                    }
+                } else {
+                    cols_node = json.get(doc, tape, target, "columns");
+                    rows_node = json.get(doc, tape, target, "rows");
+                    form_b = true;
+                    if cols_node < 0 || rows_node < 0 || !json.is_array(tape, cols_node) {
+                        code = 13;
+                    }
                 }
             }
             if code == 0 && (rows_node < 0 || !json.is_array(tape, rows_node)) {
@@ -152,7 +166,19 @@ pub fn to_csv[&h, &s, &p, &f](heap: &!h Heap, doc: &s [byte], path: &p [byte], f
                             if p2 == len(fields) || int_of(fields[p2]) == ',' {
                                 let field = fields[start..p2];
                                 var node = 0 - 1;
-                                if form_b {
+                                if form_c {
+                                    // the columns lo, hi and count of a histogram
+                                    if bytes.equal(field, "lo") {
+                                        node = json.at(tape, cols_node, r);
+                                    } else if bytes.equal(field, "hi") {
+                                        node = json.at(tape, cols_node, r + 1);
+                                    } else if bytes.equal(field, "count") {
+                                        node = json.at(tape, rows_node, r);
+                                    } else {
+                                        code = 14;
+                                        bad_row = r + 1;
+                                    }
+                                } else if form_b {
                                     // the position of the column of that name, in the columns array
                                     var c = 0;
                                     var found = 0 - 1;
