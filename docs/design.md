@@ -310,3 +310,28 @@ cut written as `if ln > 9 { ln = 10; }` (a mutant of the condition only, which c
 `fun` and `nfev` as bars, in log scale once `--logy` is built), and that is the input slice (a) already reads. A convergence plot (`fun` and the step by iteration, the simplex shrinking, the BFGS gradient norm) needs `opt` to write a trace, for instance
 `--trace FILE` with a row for each iteration: a change to cancho-opt, to be designed there, with `plot --x iter --y fun --logy` as its reader. The same holds for cancho-rl and cancho-solve: a training or solve log with a row for each step is what `plot` reads.
 Also seen while measuring: `opt minimize --method spsa --x0 -1.2,1 --objective rosenbrock --maxiter 50` with the default gains ends at x = -3.8e42 (it diverges); that belongs to cancho-opt, not to plot.
+
+## 23. Slice 5b: JSON input, and intervals that are not symmetric [choice, before the code]
+
+    <tool printing JSON> | plot --json PATH --x FIELD --y FIELD[,..] [--yerr F[,..] | --ylo F[,..] --yhi F[,..]] [--with ..] ...
+
+**Why.** `stats` and `ml` print a JSON document, not a table (section 19). Reading it directly makes `ml importance --model-file m ... | plot --json data.importance.columns --x column --y importance --with bars` the whole interface, with no
+CSV in between and no script.
+
+**PATH.** Dot-separated components from the root: a key, or a non-negative whole number (an index into an array); `.` is the root. The value there must be (A) an array of objects, a row each, or (B) an object with `columns` (an array of
+strings) and `rows` (an array of arrays), the form `ml predict` and the `trace` of section 12 of cancho-opt's design use. Anything else is `plot.json-path` (also a missing key or index).
+
+**FIELD.** In form A a dotted path into the row (`interval.estimate`, `metrics.roc_auc`), in form B a column name. A value is read as a number (an integer, or a float as the text the document holds; **`ml` writes numbers as strings, and a string that is a
+decimal is a number here**) or as text for a category (no quote, comma or byte below 0x20 or 0x7f: `plot.json-value`). A missing field, or `null`, is `plot.json-field`, with the row. `true` and `false` are refused as `plot.json-value`. At most 5,000 rows (`plot.too-many-points`);
+a document that is not JSON is `plot.json-invalid`; a document over 16 MiB is refused as the table is.
+
+**Meaning.** The rows are made into the table the other forms read (a header with the fields as written, a row each), and then everything is as for a CSV: the same refusals, the same charts, the same bytes. A float is written back as the shortest text that reads
+as the same number, so what is drawn is what the document says.
+
+**Asymmetric intervals, for CSV and JSON alike.** `--ylo` and `--yhi` take one field each for each series (the absolute low and high of the interval, as `stats test` prints `interval.low` and `interval.high`): the whisker runs from low to high. A
+`low` above the value or a `high` below it is `plot.range-invalid`; a count that is not the series' is `plot.usage`; with `--yerr` too, `plot.usage`. They apply wherever `--yerr` does, and the y range includes them. `--yerr` stays the half-length on both sides.
+
+**Not in this slice.** Histograms from `stats describe` (a bar for each bin between two edges: slice c), a key with a dot in its name (it cannot be addressed), several documents on the input, `--json` with `--term` unchanged.
+
+**Gate.** `cancho test` as before: hand-made documents for each shape (A with nested fields, B, the strings of `ml`, a category), every refusal, the real documents of `stats` and `ml` printed by the tools on a 300-row table (kept as test data and
+compared by hand-derived charts), and the measurement of the mutants of the new code against the tests alone, the rate stated.
