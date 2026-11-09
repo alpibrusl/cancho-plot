@@ -207,3 +207,21 @@ measured (section 14).
 
 **Not yet:** bars, the histogram, error bars, series from a column of categories (`--by`), the script form. `--by` would be the next thing a report asks for: its tables are long (a row per day and arm), and
 `plot` only reads wide ones (a column per series, one x for all).
+
+## 18. The tests in cancho [measured]
+
+Added after the gates above were written in Python: `tests/plot_test.cho` and `tests/plot_cases_test.cho`, run by `cancho test lib/plot/*.cho tests/plot_test.cho --std` and the same with `tests/plot_cases_test.cho` (one at a time: both define `same`; it is in `scripts/check.sh`, and `cancho.toml`
+has the two `[[test]]`). **No Python was added for this.** A `test_*` function gets a heap and nothing else, so these test the library (`ticks`, `axis`, `dumb`, `svg`, `chart.draw`) and not the binary: the
+tick cases of the gate, the four hand-drawn charts, the SVG fragments worked out from the layout, every code `chart.draw` answers with, the 5,000-row and 5-series limits, the control-byte edges (0, 9, 31,
+127 refused; 32, 126, 128, 196 accepted), the size edges of the SVG (a plot area of 20 wide, 36 of margin and 16 on the right, so a width of 72), and 15 charts whose expected text was written out once from
+the Python oracle (rounding traps, ranges that only touch, five series, zigzag lines, a blank title, markers beyond the data). 21 + 21 tests.
+
+**How good they are, measured.** The 129 distinct mutants of the library that the three Python gates list were applied to the cancho tests alone, each test file run on its own, a build error never counted as a kill, the unmutated
+sources required to pass first (a throwaway script, not kept). The first 12 tests killed 84; with the cases above, 122, then 128, then **all 129**: the survivors were cases the gates reach by chance in 200 random charts and the tests did
+not (a diagonal between two axes that only touch, a bound of the band that widens the range, a float row trap, a line of another slope, and tick marks that come out in the wrong order: a mutant that mirrors them leaves the *set* of marks
+unchanged, so the test checks their order). **Correction:** one measurement along the way said 129 of 129 when it had not measured anything: both test files had been given to one `cancho test`, which refuses them (both define
+`same`), and a build error looks like a failure; that is why the script now reports a build error as such and `check.sh` runs the files one at a time. The 18 mutants of `tools/plot/main.cho` (flag parsing and sizes) are not reachable
+from a `test_*` function; the Python gates are what covers them.
+
+**What this does not replace.** The random charts (600 ranges, 200 charts per terminal, compared with the oracle in exact fractions), the XML check, the refusals through the binary with their exit status, the garbage
+tables, and the landing page's freshness. Those stay in the Python scripts, which are not ported and not extended.

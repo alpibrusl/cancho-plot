@@ -1,0 +1,592 @@
+edition 9;
+
+// The tests of the library, run by `cancho test` (docs/design.md section 18): the hand-checked cases of the gates, in cancho, with nothing outside the program (a `test_*` function gets a heap and
+// nothing else, so the charts are drawn by the library functions and not by the binary). A failed assertion traps.
+//
+//     cancho test lib/plot/*.cho tests/plot_test.cho --std          (or: cancho test)
+import plot.axis;
+import plot.chart;
+import plot.dumb;
+import plot.svg;
+import plot.ticks;
+import std.buffer;
+import std.bytes;
+import std.test;
+
+// `got` is exactly `want`
+fn same[&h, &t](heap: &!h Heap, got: buffer.Buffer, want: &t [byte]) -> [heap] int {
+    var ok = false;
+    borrow got as &g in {
+        ok = bytes.equal(buffer.bytes(g), want);
+    }
+    buffer.drop(heap, got);
+    return test.assert(ok);
+}
+
+// `needle` is somewhere in `text`
+fn has[&t, &n](text: &t [byte], needle: &n [byte]) -> [] bool {
+    var i = 0;
+    while i + len(needle) <= len(text) {
+        var k = 0;
+        while k < len(needle) && text[i + k] == needle[k] {
+            k = k + 1;
+        }
+        if k == len(needle) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// the labels of the ticks of [lo, hi] aimed at n intervals, space separated
+fn labels[&h](heap: &!h Heap, lo: float, hi: float, n: int) -> [heap] buffer.Buffer {
+    let (m, e) = ticks.step(hi - lo, n);
+    let (first, last) = ticks.range(lo, hi, m, e);
+    var out = buffer.empty(heap, 64);
+    var k = first;
+    while k <= last {
+        if k > first {
+            out = buffer.push(heap, out, byte_of(' '));
+        }
+        out = ticks.label(heap, out, k, m, e);
+        k = k + 1;
+    }
+    return out;
+}
+
+// ---- ticks ---------------------------------------------------------------------------------------------------------------------------------------------
+
+fn test_ticks_hand[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, labels(heap, 0.0, 10.0, 5), "0 2 4 6 8 10");
+    same(heap, labels(heap, 0.0, 1.0, 5), "0.0 0.2 0.4 0.6 0.8 1.0");
+    same(heap, labels(heap, 0.0 - 3.0, 7.0, 4), "-2 0 2 4 6");
+    same(heap, labels(heap, 0.0, 100.0, 5), "0 20 40 60 80 100");
+    same(heap, labels(heap, 0.0, 7.0, 3), "0 2 4 6");
+    same(heap, labels(heap, 0.0, 10.0, 3), "0 5 10");
+    same(heap, labels(heap, 0.0, 10.0, 1), "0 10");
+    same(heap, labels(heap, 0.0, 9.0, 1), "0");
+    same(heap, labels(heap, 0.0 - 1.0, 1.0, 4), "-1.0 -0.5 0.0 0.5 1.0");
+    same(heap, labels(heap, 0.0, 0.3, 6), "0.00 0.05 0.10 0.15 0.20 0.25 0.30");
+    same(heap, labels(heap, 0.0, 9.0, 6), "0 1 2 3 4 5 6 7 8 9");
+    same(heap, labels(heap, 1000.0, 1003.0, 3), "1000 1001 1002 1003");
+    same(heap, labels(heap, 0.001, 0.0073, 5), "0.001 0.002 0.003 0.004 0.005 0.006 0.007");
+    return 0;
+}
+
+// 0.07 * 100 is 7.000000000000001 and 0.29 * 100 is 28.999999999999996 in a float: the ends still count
+fn test_ticks_rounding_traps[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, labels(heap, 0.07, 0.12, 5), "0.07 0.08 0.09 0.10 0.11 0.12");
+    same(heap, labels(heap, 0.24, 0.29, 5), "0.24 0.25 0.26 0.27 0.28 0.29");
+    return 0;
+}
+
+fn test_label[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 0, 1, 0), "0");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 0, 5, 3), "0");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 3, 5, 2), "1500");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 0 - 3, 5, 0), "-15");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 1, 5, 0 - 2), "0.05");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 7, 1, 0 - 3), "0.007");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 10, 1, 0 - 1), "1.0");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 0 - 5, 1, 0 - 1), "-0.5");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 0, 5, 0 - 1), "0.0");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 123, 1, 0 - 2), "1.23");
+    return 0;
+}
+
+// ---- the text terminal ---------------------------------------------------------------------------------------------------------------------------------
+
+// the chart of x = 0 1 2 and y = 0 1 2 (and a second series 2 1 0 when two is true), no annotations unless `ann` says so
+fn line_chart[&h, &a, &c](heap: &!h Heap, w: int, hh: int, two: bool, title: &static [byte], has_title: bool, lines: bool, ann: &a [float], ac: &c [int]) -> [heap] buffer.Buffer {
+    var out = buffer.empty(heap, 1);
+    region r {
+        let xs = alloc_slice[r](3, 0.0);
+        let ys = alloc_slice[r](6, 0.0);
+        let ns = alloc_slice[r](5, 0);
+        let ne = alloc_slice[r](5, 0);
+        xs[1] = 1.0;
+        xs[2] = 2.0;
+        ys[1] = 1.0;
+        ys[2] = 2.0;
+        ys[3] = 2.0;
+        ys[4] = 1.0;
+        ns[0] = 2;
+        ne[0] = 4;
+        ns[1] = 5;
+        ne[1] = 7;
+        var k = 1;
+        if two {
+            k = 2;
+        }
+        buffer.drop(heap, out);
+        out = dumb.render(heap, "t,y1,y2", xs, ys, 3, k, ns, ne, w, hh, title, has_title, lines, ann, ac);
+    }
+    return out;
+}
+
+fn test_dumb_one_series[&h](heap: &!h Heap) -> [heap] int {
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        same(heap, line_chart(heap, 10, 5, false, "", false, false, ann, ac), "2.0 |         *\n1.5 |\n1.0 |     *\n0.5 |\n0.0 |*\n    +----------\n     0.0 1.0\n* y1\n");
+    }
+    return 0;
+}
+
+fn test_dumb_two_series_and_title[&h](heap: &!h Heap) -> [heap] int {
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        same(heap, line_chart(heap, 10, 5, true, "T", true, false, ann, ac), "         T\n2.0 |+        *\n1.5 |\n1.0 |     +\n0.5 |\n0.0 |*        +\n    +----------\n     0.0 1.0\n* y1  + y2\n");
+    }
+    return 0;
+}
+
+// the marker, the horizontal line, the band and the diagonal: the band is rows 2 to 4, the line row 6, the marker column 10
+fn test_dumb_annotations[&h](heap: &!h Heap) -> [heap] int {
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        ann[0] = 1.0;
+        ann[8] = 0.5;
+        ann[16] = 1.0;
+        ann[17] = 1.5;
+        ac[0] = 1;
+        ac[1] = 1;
+        ac[2] = 1;
+        ac[3] = 1;
+        same(heap, line_chart(heap, 20, 8, false, "", false, false, ann, ac), "2.0 |          |       /*\n    |          |    ///\n1.5 |::::::::::|:://:::::\n    |::::::::::///:::::::\n1.0 |:::::::///*:::::::::\n    |     //   |\n0.5 |--///-----|---------\n0.0 |*/        |\n    +--------------------\n     0.0 0.5  1.0  1.5\n* y1\n");
+    }
+    return 0;
+}
+
+// lines: the points of x = 0 1 2 3 and y = 0 3 0 3 joined, on a 12 by 6 grid
+fn test_dumb_lines[&h](heap: &!h Heap) -> [heap] int {
+    region r {
+        let xs = alloc_slice[r](4, 0.0);
+        let ys = alloc_slice[r](4, 0.0);
+        let ns = alloc_slice[r](5, 0);
+        let ne = alloc_slice[r](5, 0);
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        xs[1] = 1.0;
+        xs[2] = 2.0;
+        xs[3] = 3.0;
+        ys[1] = 3.0;
+        ys[3] = 3.0;
+        ns[0] = 2;
+        ne[0] = 3;
+        same(heap, dumb.render(heap, "x,y", xs, ys, 4, 1, ns, ne, 12, 6, "", false, true, ann, ac), "3.0 |    *      *\n2.5 |   * *    *\n2.0 |  *   *   *\n1.5 |  *   *  *\n1.0 | *     * *\n0.5 |*       *\n    +------------\n     0.0  1.5 2.5\n* y\n");
+    }
+    return 0;
+}
+
+// ---- the SVG terminal ----------------------------------------------------------------------------------------------------------------------------------
+
+fn test_svg_lines[&h](heap: &!h Heap) -> [heap] int {
+    var doc = buffer.empty(heap, 1);
+    var code = 99;
+    region r {
+        let xs = alloc_slice[r](3, 0.0);
+        let ys = alloc_slice[r](3, 0.0);
+        let ns = alloc_slice[r](5, 0);
+        let ne = alloc_slice[r](5, 0);
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        xs[1] = 1.0;
+        xs[2] = 2.0;
+        ys[1] = 1.0;
+        ys[2] = 2.0;
+        ns[0] = 2;
+        ne[0] = 3;
+        let (rc, d) = svg.render(heap, "x,y", xs, ys, 3, 1, ns, ne, 640, 400, "", false, true, ann, ac);
+        code = rc;
+        buffer.drop(heap, doc);
+        doc = d;
+    }
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 400\" width=\"640\" height=\"400\" role=\"img\" aria-label=\"1 series, 3 points\">\n"));
+        test.assert(has(t, "<path d=\"M 36 12 V 356 H 624\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 356 h-4\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 12 h-4\"/>\n"));
+        test.assert(has(t, "<path d=\"M 183 356 v4\"/>\n"));
+        test.assert(has(t, "<text x=\"28\" y=\"360\" text-anchor=\"end\">0.0</text>\n"));
+        test.assert(has(t, "<text x=\"330\" y=\"374\" text-anchor=\"middle\">1.0</text>\n"));
+        test.assert(has(t, "<text x=\"50\" y=\"392\">y</text>\n"));
+        test.assert(has(t, "<path d=\"M 36 356 L 330 184 L 624 12\" fill=\"none\" stroke=\"var(--series-1, #0550ae)\" stroke-width=\"1.5\" stroke-linecap=\"round\"/>\n"));
+        test.assert(has(t, "<rect x=\"36\" y=\"383\" width=\"10\" height=\"10\" fill=\"var(--series-1, #0550ae)\"/>\n</svg>\n"));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// the annotations of section 15: a marker at x = 1, a line at y = 0.5, a band 1 to 1.5, the diagonal
+fn test_svg_annotations[&h](heap: &!h Heap) -> [heap] int {
+    var doc = buffer.empty(heap, 1);
+    region r {
+        let xs = alloc_slice[r](3, 0.0);
+        let ys = alloc_slice[r](3, 0.0);
+        let ns = alloc_slice[r](5, 0);
+        let ne = alloc_slice[r](5, 0);
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        xs[1] = 1.0;
+        xs[2] = 2.0;
+        ys[1] = 1.0;
+        ys[2] = 2.0;
+        ns[0] = 2;
+        ne[0] = 3;
+        ann[0] = 1.0;
+        ann[8] = 0.5;
+        ann[16] = 1.0;
+        ann[17] = 1.5;
+        ac[0] = 1;
+        ac[1] = 1;
+        ac[2] = 1;
+        ac[3] = 1;
+        let (rc, d) = svg.render(heap, "x,y", xs, ys, 3, 1, ns, ne, 640, 400, "", false, false, ann, ac);
+        test.assert(rc == 0);
+        buffer.drop(heap, doc);
+        doc = d;
+    }
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "<rect x=\"36\" y=\"98\" width=\"588\" height=\"86\" fill=\"var(--band, currentColor)\" fill-opacity=\"0.12\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 270 H 624\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"4 3\"/>\n"));
+        test.assert(has(t, "<path d=\"M 330 12 V 356\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"4 3\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 356 L 624 12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"1 3\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 356 h0 M 330 184 h0 M 624 12 h0\" fill=\"none\" stroke=\"var(--series-1, #0550ae)\" stroke-width=\"4\" stroke-linecap=\"round\"/>\n"));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// the title is escaped, and a tiny size is refused
+fn test_svg_title_and_size[&h](heap: &!h Heap) -> [heap] int {
+    var code = 99;
+    var doc = buffer.empty(heap, 1);
+    region r {
+        let xs = alloc_slice[r](2, 0.0);
+        let ys = alloc_slice[r](2, 0.0);
+        let ns = alloc_slice[r](5, 0);
+        let ne = alloc_slice[r](5, 0);
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        xs[1] = 1.0;
+        ys[1] = 1.0;
+        ns[0] = 2;
+        ne[0] = 3;
+        let (rc, d) = svg.render(heap, "x,y", xs, ys, 2, 1, ns, ne, 300, 200, "A & B <t> \"q\"", true, false, ann, ac);
+        code = rc;
+        buffer.drop(heap, doc);
+        doc = d;
+        let (rc2, d2) = svg.render(heap, "x,y", xs, ys, 2, 1, ns, ne, 100, 100, "t", true, false, ann, ac);
+        test.assert(rc2 == 0);
+        buffer.drop(heap, d2);
+        let (rc3, d3) = svg.render(heap, "x,y", xs, ys, 2, 1, ns, ne, 60, 100, "t", true, false, ann, ac);
+        test.assert(rc3 == 9);
+        buffer.drop(heap, d3);
+    }
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "aria-label=\"A &amp; B &lt;t&gt; &quot;q&quot;: 1 series, 2 points\""));
+        test.assert(has(t, ">A &amp; B &lt;t&gt; &quot;q&quot;</text>\n"));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// ---- reading the table: every code `chart.draw` answers with ---------------------------------------------------------------------------------------------
+
+// the code of drawing the table `text` with columns x and y, 20 by 8
+fn code_of[&h, &t](heap: &!h Heap, text: &t [byte], xspec: &static [byte], yspec: &static [byte], title: &static [byte], has_title: bool) -> [heap] (int, int) {
+    var code = 0;
+    var line = 0;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        let (c, l, out) = chart.draw(heap, text, xspec, yspec, 20, 8, title, has_title, false, false, ann, ac);
+        buffer.drop(heap, out);
+        code = c;
+        line = l;
+    }
+    return (code, line);
+}
+
+fn test_chart_refusals[&h](heap: &!h Heap) -> [heap] int {
+    let (c0, l0) = code_of(heap, "x,y\n1,2\n3,4\n", "x", "y", "", false);
+    test.assert(c0 == 0);
+    let (c1, l1) = code_of(heap, "x,y\n1,\"2\"\n3,4\n", "x", "y", "", false);
+    test.assert(c1 == 1);
+    let (c2, l2) = code_of(heap, "x,y\n1,2\n3,4\n5,a\n", "x", "y", "", false);
+    test.assert(c2 == 2);
+    test.assert(l2 == 4);
+    let (c3, l3) = code_of(heap, "x,y\n1,2\n3\n", "x", "y", "", false);
+    test.assert(c3 == 3);
+    test.assert(l3 == 3);
+    let (c4, l4) = code_of(heap, "x,y\n", "x", "y", "", false);
+    test.assert(c4 == 4);
+    let (c4b, l4b) = code_of(heap, "", "x", "y", "", false);
+    test.assert(c4b == 4);
+    let (c5, l5) = code_of(heap, "x,y\n1,2\n", "q", "y", "", false);
+    test.assert(c5 == 5);
+    let (c5b, l5b) = code_of(heap, "x,y\n1,2\n", "x", "9", "", false);
+    test.assert(c5b == 5);
+    let (c5c, l5c) = code_of(heap, "x,y\n1,2\n", "0", "y", "", false);
+    test.assert(c5c == 5);
+    let (c7, l7) = code_of(heap, "x,y\n1e300,1\n-1e300,2\n", "x", "y", "", false);
+    test.assert(c7 == 7);
+    let (c8, l8) = code_of(heap, "x,y\n1,2\n", "x", "y,y,y,y,y,y", "", false);
+    test.assert(c8 == 8);
+    let (c10, l10) = code_of(heap, "x,y\n1,2\n", "x", "y", "a\tb", true);
+    test.assert(c10 == 10);
+    return 0;
+}
+
+// the columns by number, CRLF line endings, a last line with no newline
+fn test_chart_reading[&h](heap: &!h Heap) -> [heap] int {
+    let (a, la) = code_of(heap, "x,y\r\n1,2\r\n3,4\r\n", "1", "2", "", false);
+    test.assert(a == 0);
+    let (b, lb) = code_of(heap, "x,y\n1,2\n3,4", "x", "y", "", false);
+    test.assert(b == 0);
+    let (c, lc) = code_of(heap, "x,y\n1,2\n3,4\n", "2", "1", "", false);
+    test.assert(c == 0);
+    return 0;
+}
+
+// ---- more of the cases the gates' mutants asked for ----------------------------------------------------------------------------------------------------
+
+fn test_ticks_edges[&h](heap: &!h Heap) -> [heap] int {
+    // a raw step of 7.5 is above 7, so 10; a negative range ends below zero, so the last tick is rounded down
+    same(heap, labels(heap, 0.0, 37.5, 5), "0 10 20 30");
+    same(heap, labels(heap, 0.0 - 7.0, 0.0 - 1.0, 3), "-6 -4 -2");
+    // the point is placed d from the right, with the zero kept (a fraction equal to a power of ten)
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 110, 1, 0 - 2), "1.10");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 100, 1, 0 - 2), "1.00");
+    same(heap, ticks.label(heap, buffer.empty(heap, 8), 101, 1, 0 - 2), "1.01");
+    return 0;
+}
+
+// the table of `rows` rows with a header, one number a row
+fn table_of[&h](heap: &!h Heap, rows: int) -> [heap] buffer.Buffer {
+    var t = buffer.append(heap, buffer.empty(heap, 64), "x,y\n");
+    var i = 0;
+    while i < rows {
+        t = buffer.push_nat(heap, t, i);
+        t = buffer.push(heap, t, byte_of(','));
+        t = buffer.push_nat(heap, t, i * 2);
+        t = buffer.push(heap, t, byte_of(10));
+        i = i + 1;
+    }
+    return t;
+}
+
+fn code_of_buffer[&h](heap: &!h Heap, text: buffer.Buffer, ycols: &static [byte]) -> [heap] int {
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        borrow text as &tb in {
+            let (c, l, out) = chart.draw(heap, buffer.bytes(tb), "x", ycols, 20, 8, "", false, false, false, ann, ac);
+            buffer.drop(heap, out);
+            code = c;
+        }
+    }
+    buffer.drop(heap, text);
+    return code;
+}
+
+fn test_chart_limits[&h](heap: &!h Heap) -> [heap] int {
+    test.assert(code_of_buffer(heap, table_of(heap, 5000), "y") == 0);
+    test.assert(code_of_buffer(heap, table_of(heap, 5001), "y") == 6);
+    // 1e14 wide a range 1 wide, and 2e15 away from zero: neither can be ticked
+    let (c1, l1) = code_of(heap, "x,y\n100000000000000,1\n100000000000001,2\n", "x", "y", "", false);
+    test.assert(c1 == 7);
+    let (c2, l2) = code_of(heap, "x,y\n2000000000000000,1\n3000000000000000,2\n", "x", "y", "", false);
+    test.assert(c2 == 7);
+    let (c3, l3) = code_of(heap, "x,y\n0,1\n1000000000000000,2\n", "x", "y", "", false);
+    test.assert(c3 == 0);
+    // five series are drawn, six are not
+    let (c4, l4) = code_of(heap, "x,a,b,c,d,e\n1,2,3,4,5,6\n2,3,4,5,6,7\n", "x", "a,b,c,d,e", "", false);
+    test.assert(c4 == 0);
+    let (c5, l5) = code_of(heap, "x,a,b,c,d,e,f\n1,2,3,4,5,6,7\n", "x", "a,b,c,d,e,f", "", false);
+    test.assert(c5 == 8);
+    return 0;
+}
+
+// the title is text from 0x20 up, 0x7f included in the bytes that are not
+fn title_code[&h](heap: &!h Heap, middle: int) -> [heap] int {
+    var title = buffer.push(heap, buffer.push(heap, buffer.empty(heap, 4), byte_of('a')), byte_of(middle));
+    title = buffer.push(heap, title, byte_of('b'));
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        borrow title as &tb in {
+            let (c, l, out) = chart.draw(heap, "x,y\n1,2\n3,4\n", "x", "y", 20, 8, buffer.bytes(tb), true, false, false, ann, ac);
+            buffer.drop(heap, out);
+            code = c;
+        }
+    }
+    buffer.drop(heap, title);
+    return code;
+}
+
+fn test_title_bytes[&h](heap: &!h Heap) -> [heap] int {
+    test.assert(title_code(heap, 0) == 10);
+    test.assert(title_code(heap, 9) == 10);
+    test.assert(title_code(heap, 31) == 10);
+    test.assert(title_code(heap, 127) == 10);
+    test.assert(title_code(heap, 32) == 0);
+    test.assert(title_code(heap, 126) == 0);
+    test.assert(title_code(heap, 128) == 0);
+    test.assert(title_code(heap, 196) == 0);
+    return 0;
+}
+
+// the svg of a table, through the whole reading
+fn svg_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: int, hh: int, title: &static [byte], has_title: bool, lines: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 1);
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        let (c, l, chart) = chart.draw(heap, table, "x", ycols, w, hh, title, has_title, lines, true, ann, ac);
+        code = c;
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return (code, out);
+}
+
+fn count[&t, &n](text: &t [byte], needle: &n [byte]) -> [] int {
+    var total = 0;
+    var i = 0;
+    while i + len(needle) <= len(text) {
+        var k = 0;
+        while k < len(needle) && text[i + k] == needle[k] {
+            k = k + 1;
+        }
+        if k == len(needle) {
+            total = total + 1;
+        }
+        i = i + 1;
+    }
+    return total;
+}
+
+fn test_svg_five_series_and_title[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = svg_of(heap, "x,a,b,c,d,e\n0,0,1,2,3,4\n1,1,2,3,4,0\n", "a,b,c,d,e", 640, 400, "T", true, true);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "stroke=\"var(--series-2, #bc4c00)\""));
+        test.assert(has(t, "stroke=\"var(--series-3, #1a7f37)\""));
+        test.assert(has(t, "stroke=\"var(--series-4, #8250df)\""));
+        test.assert(has(t, "stroke=\"var(--series-5, #cf222e)\""));
+        test.assert(has(t, "<rect x=\"20\" y=\"383\" width=\"10\" height=\"10\" fill=\"var(--series-1, #0550ae)\"/>\n<rect x=\"170\" y=\"383\" width=\"10\" height=\"10\" fill=\"var(--series-2, #bc4c00)\"/>\n"));
+        test.assert(has(t, "<text x=\"320\" y=\"20\" text-anchor=\"middle\" font-size=\"14\">T</text>\n"));
+        test.assert(has(t, "<path d=\"M 20 36 V 356 H 624\"/>\n"));
+        test.assert(has(t, "aria-label=\"T: 5 series, 2 points\""));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+// the plot area must be 20 wide: 36 of margin and 16 on the right leave 20 at a width of 72
+fn test_svg_smallest_width[&h](heap: &!h Heap) -> [heap] int {
+    let (c72, d72) = svg_of(heap, "x,y\n0,0\n2,2\n", "y", 72, 300, "", false, false);
+    test.assert(c72 == 0);
+    buffer.drop(heap, d72);
+    let (c71, d71) = svg_of(heap, "x,y\n0,0\n2,2\n", "y", 71, 300, "", false, false);
+    test.assert(c71 == 9);
+    buffer.drop(heap, d71);
+    return 0;
+}
+
+// x labels are kept when they are 8 (len + 1) apart, 32 pixels for 3 characters (width 180), and thinned when they are not (width 100)
+fn test_svg_x_labels[&h](heap: &!h Heap) -> [heap] int {
+    let (ca, da) = svg_of(heap, "x,y\n0,0\n2,2\n", "y", 180, 300, "", false, false);
+    test.assert(ca == 0);
+    borrow da as &dab in {
+        test.assert(count(buffer.bytes(dab), "text-anchor=\"middle\">") == 5);
+        test.assert(has(buffer.bytes(dab), ">0.5</text>"));
+    }
+    buffer.drop(heap, da);
+    let (cb, db) = svg_of(heap, "x,y\n0,0\n2,2\n", "y", 100, 300, "", false, false);
+    test.assert(cb == 0);
+    borrow db as &dbb in {
+        test.assert(count(buffer.bytes(dbb), "text-anchor=\"middle\">") == 2);
+    }
+    buffer.drop(heap, db);
+    return 0;
+}
+
+fn test_svg_ticks_and_single_point[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = svg_of(heap, "x,y\n0,0\n1,1\n2,2\n", "y", 640, 400, "", false, true);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "<text x=\"28\" y=\"274\" text-anchor=\"end\">0.5</text>\n"));
+        test.assert(has(t, "<text x=\"28\" y=\"102\" text-anchor=\"end\">1.5</text>\n"));
+    }
+    buffer.drop(heap, doc);
+    let (c1, d1) = svg_of(heap, "x,y\n5,5\n", "y", 640, 400, "", false, true);
+    test.assert(c1 == 0);
+    borrow d1 as &d1b in {
+        test.assert(has(buffer.bytes(d1b), "d=\"M 330 184 h0\""));
+        test.assert(!has(buffer.bytes(d1b), " L "));
+    }
+    buffer.drop(heap, d1);
+    return 0;
+}
+
+// the svg of a table with the diagonal asked for
+fn svg_diag[&h, &t](heap: &!h Heap, table: &t [byte]) -> [heap] buffer.Buffer {
+    var out = buffer.empty(heap, 1);
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        ac[3] = 1;
+        let (c, l, chart) = chart.draw(heap, table, "x", "y", 640, 400, "", false, false, true, ann, ac);
+        test.assert(c == 0);
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return out;
+}
+
+// the diagonal runs from the larger lower end to the smaller upper end of the two axes, and not at all when they only touch
+fn test_svg_diagonal_ends[&h](heap: &!h Heap) -> [heap] int {
+    let a = svg_diag(heap, "x,y\n0,1\n4,3\n");
+    borrow a as &ab in {
+        test.assert(has(buffer.bytes(ab), "<path d=\"M 183 356 L 477 12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"1 3\"/>\n"));
+    }
+    buffer.drop(heap, a);
+    let b = svg_diag(heap, "x,y\n0,2\n2,4\n");
+    borrow b as &bb in {
+        test.assert(!has(buffer.bytes(bb), "stroke-dasharray=\"1 3\""));
+    }
+    buffer.drop(heap, b);
+    return 0;
+}
+
+// the tick marks, one for each tick, at the height of the tick
+fn test_svg_tick_marks[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = svg_of(heap, "x,y\n0,0\n2,2\n", "y", 640, 400, "", false, false);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        // in the order of the ticks: the lowest first
+        test.assert(has(t, "<path d=\"M 36 356 h-4\"/>\n<path d=\"M 36 270 h-4\"/>\n<path d=\"M 36 184 h-4\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 270 h-4\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 98 h-4\"/>\n"));
+        test.assert(has(t, "<path d=\"M 36 184 h-4\"/>\n"));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}

@@ -7,3 +7,13 @@ name = "plot"
 sources = ["lib/plot", "tools/plot"]   # lib/plot/{num,ticks,csv,axis,dumb,svg,chart}.cho, tools/plot/main.cho
 std = true
 out = "build/plot"
+
+[[test]]
+name = "plot"
+sources = ["lib/plot", "tests/plot_test.cho"]
+std = true
+
+[[test]]
+name = "cases"
+sources = ["lib/plot", "tests/plot_cases_test.cho"]
+std = true

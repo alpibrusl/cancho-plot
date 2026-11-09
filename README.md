@@ -18,6 +18,7 @@ PLOT=build/plot python3 scripts/check_ticks.py [--mutants]                      
 PLOT=build/plot python3 scripts/check_dumb.py [--mutants]
 PLOT=build/plot python3 scripts/check_svg.py [--mutants]
 PLOT=build/plot python3 scripts/check_site.py                                                   # the landing page is what the binary writes now
+cancho test lib/plot/*.cho tests/plot_test.cho --std                                            # the tests (and tests/plot_cases_test.cho) written in cancho (docs/design.md section 18)
 CANCHO=... [MUTANTS=1] scripts/check.sh                                                       # all of it
 ```
 

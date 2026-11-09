@@ -1,0 +1,144 @@
+edition 9;
+
+// Charts drawn by the text terminal that the exact-arithmetic oracle of scripts/check_dumb.py also drew; the expected texts were written out from it once (each is a case the gates found a
+// gap in: float rounding traps, ranges that only touch, five series, zigzag lines, blank titles, markers beyond the data). Run by `cancho test` with tests/plot_test.cho.
+import plot.chart;
+import std.buffer;
+import std.bytes;
+import std.test;
+
+fn same[&h, &t](heap: &!h Heap, got: buffer.Buffer, want: &t [byte]) -> [heap] int {
+    var ok = false;
+    borrow got as &g in {
+        ok = bytes.equal(buffer.bytes(g), want);
+    }
+    buffer.drop(heap, got);
+    return test.assert(ok);
+}
+
+// the chart of `table` (x in the first column, the series named by `ycols`), `w` by `h`; the annotations are one marker (nv = 1), one line (nh = 1), one band (nb = 1) and the diagonal when asked
+fn chart_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: int, hh: int, title: &static [byte], has_title: bool, lines: bool, nv: int, vl: float, nh: int, hl: float, nb: int, lo: float, hi: float, diag: int) -> [heap] buffer.Buffer {
+    var out = buffer.empty(heap, 1);
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](4, 0);
+        ann[0] = vl;
+        ann[8] = hl;
+        ann[16] = lo;
+        ann[17] = hi;
+        ac[0] = nv;
+        ac[1] = nh;
+        ac[2] = nb;
+        ac[3] = diag;
+        let (code, line, chart) = chart.draw(heap, table, "x", ycols, w, hh, title, has_title, lines, false, ann, ac);
+        test.assert(code == 0);
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return out;
+}
+
+fn test_dumb_trapA[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0.29\n1,0.34\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "0.34 |                   *\n0.33 |\n     |\n0.32 |\n0.31 |\n     |\n0.30 |\n0.29 |*\n     +--------------------\n      0.0    0.4 0.6 0.8\n* y\n");
+    return 0;
+}
+
+fn test_dumb_trapB[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0.02\n1,0.07\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "0.07 |                   *\n0.06 |\n     |\n0.05 |\n0.04 |\n     |\n0.03 |\n0.02 |*\n     +--------------------\n      0.0    0.4 0.6 0.8\n* y\n");
+    return 0;
+}
+
+fn test_dumb_trapC[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0.29,0\n0.34,1\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "1.0 |                   *\n0.8 |\n    |\n0.6 |\n0.4 |\n    |\n0.2 |\n0.0 |*\n    +--------------------\n     0.29  0.31    0.33\n* y\n");
+    return 0;
+}
+
+fn test_dumb_trapD[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0.02,0\n0.07,1\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "1.0 |                   *\n0.8 |\n    |\n0.6 |\n0.4 |\n    |\n0.2 |\n0.0 |*\n    +--------------------\n     0.02  0.04    0.06\n* y\n");
+    return 0;
+}
+
+fn test_dumb_touch[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,2\n2,4\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 1), "4.0 |                   *\n    |\n3.5 |\n    |\n3.0 |\n    |\n2.5 |\n2.0 |*\n    +--------------------\n     0.0 0.5  1.0  1.5\n* y\n");
+    return 0;
+}
+
+fn test_dumb_diag13[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,1\n4,3\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 1), "3.0 |               /   *\n    |             //\n2.5 |            /\n    |          //\n2.0 |         /\n    |        /\n1.5 |      //\n1.0 |*    /\n    +--------------------\n     0.0 1.0  2.0  3.0\n* y\n");
+    return 0;
+}
+
+fn test_dumb_diag31[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n1,0\n3,4\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 1), "4 |                   *\n  |\n3 |                 ///\n  |            /////\n2 |        ////\n  |   /////\n1 |///\n0 |*\n  +--------------------\n   1.0 1.5  2.0  2.5\n* y\n");
+    return 0;
+}
+
+fn test_dumb_aims[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n9,9\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "10 |                   *\n 8 |\n   |\n 6 |\n 4 |\n   |\n 2 |\n 0 |*\n   +--------------------\n    0 1 2 3 4  5 6 7 8 9\n* y\n");
+    return 0;
+}
+
+fn test_dumb_five[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,a,b,c,d,e\n0,0,1,2,3,4\n1,1,2,3,4,0\n2,2,3,4,0,1\n3,3,4,0,1,2\n", "a,b,c,d,e", 24, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "4 |#       o       x      +\n  |\n3 |o       x       +      *\n  |\n2 |x       +       *      #\n  |\n1 |+       *       #      o\n0 |*       #       o      x\n  +------------------------\n   0.0    1.0 1.5 2.0 2.5\n* a  + b  x c  o d  # e\n");
+    return 0;
+}
+
+fn test_dumb_zigzag[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,a,b\n0,0,5\n3,6,1\n1,2,4\n4,7,0\n2,1,6\n5,3,3\n", "a,b", 30, 10, "", false, true, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "7 |                       **\n6 |            +++  **  ***\n5 |++           ++++++***\n  |  +++        **+** ++++\n4 |     +++   **** ++*    ++++\n3 |        ++++*   **+        +++\n  |      **** ++++*   ++******\n2 |    ****     *+++++**+\n1 |  **        ***  +++++++\n0 |**                     ++\n  +------------------------------\n   0     1     2     3     4    5\n* a  + b\n");
+    return 0;
+}
+
+fn test_dumb_backleft[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,a\n5,0\n1,4\n4,1\n0,3\n", "a", 24, 8, "", false, true, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "4 |    **\n  |      ***\n3 |***     ***\n  |   *****   ***\n2 |        **** ****\n  |            *******\n1 |                 *****\n0 |                      **\n  +------------------------\n   0   1    2    3    4   5\n* a\n");
+    return 0;
+}
+
+fn test_dumb_blank[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n1,1\n", "y", 20, 6, " ", true, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "\n1.0 |                   *\n0.8 |\n0.6 |\n0.4 |\n0.2 |\n0.0 |*\n    +--------------------\n     0.0    0.4 0.6 0.8\n* y\n");
+    return 0;
+}
+
+fn test_dumb_outside[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n1,1\n", "y", 20, 8, "", false, false, 1, 5.0, 1, 7.0, 1, 3.0, 4.0, 0), "7 |-------------------|\n6 |                   |\n5 |                   |\n4 |:::::::::::::::::::|\n3 |:::::::::::::::::::|\n2 |                   |\n1 |    *              |\n0 |*                  |\n  +--------------------\n   0   1   2   3   4  5\n* y\n");
+    return 0;
+}
+
+fn test_dumb_outlow[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n1,1\n", "y", 20, 8, "", false, false, 1, -5.0, 1, -7.0, 1, -4.0, -3.0, 0), " 2 ||                  *\n 0 ||               *\n   ||\n-2 ||\n-4 ||:::::::::::::::::::\n   ||\n-6 ||\n-8 ||-------------------\n   +--------------------\n    -5   -3  -2 -1  0  1\n* y\n");
+    return 0;
+}
+
+fn test_dumb_bandonly[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n1,1\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 1, 3.0, 4.0, 0), "4 |::::::::::::::::::::\n  |::::::::::::::::::::\n3 |::::::::::::::::::::\n  |\n2 |\n  |\n1 |                   *\n0 |*\n  +--------------------\n   0.0    0.4 0.6 0.8\n* y\n");
+    return 0;
+}
+
+fn test_dumb_rowtrap[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n1,0.5\n2,0.4\n", "y", 20, 5, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "0.5 |          *\n0.4 |                   *\n0.3 |\n0.2 |\n0.1 |*\n    +--------------------\n     0.0 0.5  1.0  1.5\n* y\n");
+    return 0;
+}
+
+fn test_dumb_lines1[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n1,1\n2,3\n3,2\n4,6\n5,0\n", "y", 30, 12, "", false, true, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "6 |                        *\n  |                       **\n5 |                       * *\n  |                      *  *\n4 |                     *    *\n  |                    *     *\n3 |            **      *      *\n  |          **  ***  *       *\n2 |         *       **         *\n  |       **                   *\n1 |   ****                      *\n0 |***                          *\n  +------------------------------\n   0     1     2     3     4    5\n* y\n");
+    return 0;
+}
+
+fn test_dumb_lines2[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,0\n10,1\n11,9\n", "y", 40, 9, "", false, true, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "10 |                                    *\n 8 |                                    *\n   |                                   *\n 6 |                                   *\n   |                                   *\n 4 |                                  *\n   |                                  *\n 2 |                                 *\n 0 |**********************************\n   +----------------------------------------\n    0     2      4      6     8     10    12\n* y\n");
+    return 0;
+}
+
+fn test_dumb_lines3[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,a,b\n5,0,9\n3,4,1\n4,2,7\n0,6,3\n", "a,b", 33, 11, "", false, true, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "10 |\n   |                                +\n 8 |                              ++\n   |                       ++++ ++\n 6 |****             ++++++  + +\n   |    ******+++++++       +++\n 4 |    ++++++*******  ** +++\n   |++++             ****+++*\n 2 |                    ++ *****\n   |                   +        ***\n 0 |                               **\n   +---------------------------------\n    0     1      2     3      4     5\n* a  + b\n");
+    return 0;
+}
+
+fn test_dumb_lines4[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n0,5\n7,4\n8,0\n1,3\n", "y", 27, 7, "", false, true, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "5 |************\n4 |            ************\n3 |   ***                  *\n  |      ******            *\n2 |            ******       *\n1 |                  ****** *\n0 |                        ***\n  +---------------------------\n   0  1  2   3  4  5   6  7  8\n* y\n");
+    return 0;
+}
+
+fn test_dumb_constant[&h](heap: &!h Heap) -> [heap] int {
+    same(heap, chart_of(heap, "x,y\n5,3\n5,3\n", "y", 20, 8, "", false, false, 0, 0.0, 0, 0.0, 0, 0.0, 0.0, 0), "4.0 |\n    |\n3.5 |\n    |\n3.0 |          *\n    |\n2.5 |\n2.0 |\n    +--------------------\n     4.0 4.5  5.0  5.5\n* y\n");
+    return 0;
+}
