@@ -43,7 +43,7 @@ pub fn axis(lo: float, hi: float, n: int) -> [] (float, float, int, int, int, in
 }
 
 // The ranges of a chart: the points, and the annotations (docs/design.md section 15). `ann` holds the --vline values at 0, the --hline values at 8 and the band ends (lo, hi) at 16; `ac` holds how many of
-// each there are (vlines, hlines, bands) and whether the diagonal is asked for. Answers (xlo, xhi, ylo, yhi).
+// each there are (vlines, hlines, bands) and whether the diagonal is asked for; `ac[4]` is 1 for bars and `ac[5]` is how many series have error bars. Answers (xlo, xhi, ylo, yhi).
 pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, ann: &c [float], ac: &d [int]) -> [] (float, float, float, float) {
     var xlo = xs[0];
     var xhi = xs[0];
@@ -98,6 +98,32 @@ pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, an
             yhi = ann[16 + i];
         }
         i = i + 1;
+    }
+    // bars start at 0 (section 20)
+    if ac[4] == 1 {
+        if ylo > 0.0 {
+            ylo = 0.0;
+        }
+        if yhi < 0.0 {
+            yhi = 0.0;
+        }
+    }
+    // error bars: value - err and value + err (the half-lengths follow the k series in ys)
+    var j = 0;
+    while j < ac[5] {
+        i = 0;
+        while i < n {
+            let v = ys[j * n + i];
+            let er = ys[(k + j) * n + i];
+            if v - er < ylo {
+                ylo = v - er;
+            }
+            if v + er > yhi {
+                yhi = v + er;
+            }
+            i = i + 1;
+        }
+        j = j + 1;
     }
     return (xlo, xhi, ylo, yhi);
 }

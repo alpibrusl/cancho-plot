@@ -239,7 +239,7 @@ def gate(exe):
         (["--x", "x", "--y", "y", "--diag", "1"], ok, "plot.usage"),
         (["--x", "x", "--y", "y", "--band", "1,1"], ok, None),                         # an empty band is a band
         (["--x", "x", "--y", "y", "--vline", "1e300"], ok, "plot.range-invalid"),
-        (["--x", "x", "--y", "y", "--with", "bars"], ok, "plot.usage"),
+        (["--x", "x", "--y", "y", "--with", "pie"], ok, "plot.usage"),
         (["--x", "x", "--y", "y", "--title", "a\x01b"], ok, "plot.text-invalid"),
         (["--x", "x", "--y", "y", "--title", "a\x7fb"], ok, "plot.text-invalid"),
         (["--x", "x", "--y", "y", "--title", "a\x1fb"], ok, "plot.text-invalid"),

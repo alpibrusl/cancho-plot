@@ -53,8 +53,20 @@ fn flush[&h](heap: &!h Heap, out: buffer.Buffer, line: buffer.Buffer) -> [heap] 
     return buffer.push(heap, o, byte_of(10));
 }
 
+// the group of bars of category i (section 20): its first column and the width of a bar, for n categories and k series on w columns
+fn slot(w: int, n: int, k: int, i: int) -> [] (int, int) {
+    let s0 = i * w / n;
+    let sw = (i + 1) * w / n - s0;
+    var gap = 0;
+    if sw > k {
+        gap = 1;
+    }
+    let bw = (sw - gap) / k;
+    return (s0 + (sw - k * bw) / 2, bw);
+}
+
 // The chart of the `n` points of `xs` and the `k` series of `ys` (series j is ys[j*n..j*n+n]), `w` by `h` characters; the names of the series are text[ns[j]..ne[j]].
-pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, ann: &e [float], ac: &f [int]) -> [heap] buffer.Buffer {
+pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], cs: &g2 [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, ann: &e [float], ac: &f [int]) -> [heap] buffer.Buffer {
     let (xlo, xhi, ylo, yhi) = axis.extent(xs, ys, n, k, ann, ac);
     var i = 0;
     let (xl0, xh0, xok) = axis.fix(xlo, xhi);
@@ -133,40 +145,92 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte
             }
         }
         var j = 0;
-        while j < k {
+        if ac[4] == 1 {
+            // bars (section 20): from the row of 0 to the row of the value, the rows of both included
+            let rz = rowcell(0.0, ylo2, yhi2, hh);
+            var ci = 0;
+            while ci < n {
+                let (gs, bw) = slot(w, n, k, ci);
+                while j < k {
+                    let rv = rowcell(ys[j * n + ci], ylo2, yhi2, hh);
+                    var top = rz;
+                    var bot = rv;
+                    if rv < rz {
+                        top = rv;
+                        bot = rz;
+                    }
+                    var rr = top;
+                    while rr <= bot {
+                        var cc = 0;
+                        while cc < bw {
+                            grid[rr * w + gs + j * bw + cc] = glyphs[j];
+                            cc = cc + 1;
+                        }
+                        rr = rr + 1;
+                    }
+                    j = j + 1;
+                }
+                j = 0;
+                ci = ci + 1;
+            }
+        } else {
+            while j < k {
+                i = 0;
+                while i < n {
+                    let col = colcell(xs[i], xlo2, xhi2, w);
+                    let row = rowcell(ys[j * n + i], ylo2, yhi2, hh);
+                    if lines && i > 0 {
+                        // the segment from the previous point (section 13): integers only, a half goes up
+                        let c0 = colcell(xs[i - 1], xlo2, xhi2, w);
+                        let r0 = rowcell(ys[j * n + i - 1], ylo2, yhi2, hh);
+                        var dc = col - c0;
+                        var dr = row - r0;
+                        var sc = 1;
+                        var sr = 1;
+                        if dc < 0 {
+                            dc = 0 - dc;
+                            sc = 0 - 1;
+                        }
+                        if dr < 0 {
+                            dr = 0 - dr;
+                            sr = 0 - 1;
+                        }
+                        var m = dc;
+                        if dr > m {
+                            m = dr;
+                        }
+                        var step = 0;
+                        while step <= m && m > 0 {
+                            let cc = c0 + sc * ((2 * dc * step + m) / (2 * m));
+                            let rr = r0 + sr * ((2 * dr * step + m) / (2 * m));
+                            grid[rr * w + cc] = glyphs[j];
+                            step = step + 1;
+                        }
+                    }
+                    grid[row * w + col] = glyphs[j];
+                    i = i + 1;
+                }
+                j = j + 1;
+            }
+        }
+        // error bars (section 20): the glyph | from the row of value + err to the row of value - err
+        j = 0;
+        while j < ac[5] {
             i = 0;
             while i < n {
-                let col = colcell(xs[i], xlo2, xhi2, w);
-                let row = rowcell(ys[j * n + i], ylo2, yhi2, hh);
-                if lines && i > 0 {
-                    // the segment from the previous point (section 13): integers only, a half goes up
-                    let c0 = colcell(xs[i - 1], xlo2, xhi2, w);
-                    let r0 = rowcell(ys[j * n + i - 1], ylo2, yhi2, hh);
-                    var dc = col - c0;
-                    var dr = row - r0;
-                    var sc = 1;
-                    var sr = 1;
-                    if dc < 0 {
-                        dc = 0 - dc;
-                        sc = 0 - 1;
-                    }
-                    if dr < 0 {
-                        dr = 0 - dr;
-                        sr = 0 - 1;
-                    }
-                    var m = dc;
-                    if dr > m {
-                        m = dr;
-                    }
-                    var step = 0;
-                    while step <= m && m > 0 {
-                        let cc = c0 + sc * ((2 * dc * step + m) / (2 * m));
-                        let rr = r0 + sr * ((2 * dr * step + m) / (2 * m));
-                        grid[rr * w + cc] = glyphs[j];
-                        step = step + 1;
-                    }
+                let v = ys[j * n + i];
+                let er = ys[(k + j) * n + i];
+                var wc = colcell(xs[i], xlo2, xhi2, w);
+                if ac[4] == 1 {
+                    let (gs, bw) = slot(w, n, k, i);
+                    wc = gs + j * bw + bw / 2;
                 }
-                grid[row * w + col] = glyphs[j];
+                var ra = rowcell(v + er, ylo2, yhi2, hh);
+                let rb = rowcell(v - er, ylo2, yhi2, hh);
+                while ra <= rb {
+                    grid[ra * w + wc] = byte_of('|');
+                    ra = ra + 1;
+                }
                 i = i + 1;
             }
             j = j + 1;
@@ -258,7 +322,38 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte
         // the labels of the x axis
         let xl = alloc_slice[r](w, byte_of(' '));
         var prev_end = 0 - 2;
+        if ac[4] == 1 {
+            // the label of a category, cut to 10 bytes, centred on its slot (section 20)
+            var ci = 0;
+            while ci < n {
+                var ln = cs[2 * ci + 1] - cs[2 * ci];
+                if ln > 10 {
+                    ln = 10;
+                }
+                let s0 = ci * w / n;
+                let col = s0 + ((ci + 1) * w / n - s0) / 2;
+                var start = col - ln / 2;
+                if start > w - ln {
+                    start = w - ln;
+                }
+                if start < 0 {
+                    start = 0;
+                }
+                if ln <= w && start >= prev_end + 1 {
+                    var u = 0;
+                    while u < ln {
+                        xl[start + u] = text[cs[2 * ci] + u];
+                        u = u + 1;
+                    }
+                    prev_end = start + ln;
+                }
+                ci = ci + 1;
+            }
+        }
         var q = xk0;
+        if ac[4] == 1 {
+            q = xk1 + 1;
+        }
         while q <= xk1 {
             let (lb, ln) = axis.used(ticks.label(heap, buffer.empty(heap, 16), q, xm, xe));
             let col = colcell(ticks.value(q, xm, xe), xlo2, xhi2, w);

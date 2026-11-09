@@ -309,6 +309,169 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 </div>
 <p class="cmd"><code>plot --x day --y margin --term svg --title 'Holdout margin per hotel-day' &lt; holdout.csv</code> <a href="data/holdout.csv">the table</a> <a href="gallery/real.svg">the svg</a></p>
 </figure>
+<figure id="bars">
+<h3>Bars with error bars: permutation importance</h3>
+<p>The shape of what <code>ml importance</code> prints: a category on x (the cell's text), the importance as the bar, its standard deviation as the error bar (<code>--yerr std</code>). The y range includes 0.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Permutation importance (roc_auc): 1 series, 4 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 109.5 356 v4"/>
+<path d="M 256.5 356 v4"/>
+<path d="M 403.5 356 v4"/>
+<path d="M 550.5 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Permutation importance (roc_auc)</text>
+<text x="28" y="360" text-anchor="end">0.0</text>
+<text x="28" y="296" text-anchor="end">0.1</text>
+<text x="28" y="232" text-anchor="end">0.2</text>
+<text x="28" y="168" text-anchor="end">0.3</text>
+<text x="28" y="104" text-anchor="end">0.4</text>
+<text x="28" y="40" text-anchor="end">0.5</text>
+<text x="109.5" y="374" text-anchor="middle">x1</text>
+<text x="256.5" y="374" text-anchor="middle">x2</text>
+<text x="403.5" y="374" text-anchor="middle">x3</text>
+<text x="550.5" y="374" text-anchor="middle">g</text>
+<text x="50" y="392">importance</text>
+</g>
+<rect x="50.7" y="105.76" width="117.6" height="250.24" fill="var(--series-1, #0550ae)"/>
+<rect x="197.7" y="280.48" width="117.6" height="75.52" fill="var(--series-1, #0550ae)"/>
+<rect x="344.7" y="322.72" width="117.6" height="33.28" fill="var(--series-1, #0550ae)"/>
+<rect x="491.7" y="351.52" width="117.6" height="4.48" fill="var(--series-1, #0550ae)"/>
+<path d="M 109.5 89.12 V 122.4 M 106.5 89.12 h6 M 106.5 122.4 h6 M 256.5 268.32 V 292.64 M 253.5 268.32 h6 M 253.5 292.64 h6 M 403.5 315.68 V 329.76 M 400.5 315.68 h6 M 400.5 329.76 h6 M 550.5 348.96 V 354.08 M 547.5 348.96 h6 M 547.5 354.08 h6" fill="none" stroke="currentColor" stroke-width="1"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x feature --y importance --with bars --yerr std --term svg --title 'Permutation importance (roc_auc)' &lt; importance.csv</code> <a href="data/importance.csv">the table</a> <a href="gallery/bars.svg">the svg</a></p>
+</figure>
+<figure id="grouped">
+<h3>Grouped bars: three metrics in four folds</h3>
+<p>Several series are grouped side by side in the order of <code>--y</code>: the metrics of each fold of <code>ml cv</code>.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Cross-validation by fold: 3 series, 4 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 109.5 356 v4"/>
+<path d="M 256.5 356 v4"/>
+<path d="M 403.5 356 v4"/>
+<path d="M 550.5 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Cross-validation by fold</text>
+<text x="28" y="360" text-anchor="end">0.0</text>
+<text x="28" y="296" text-anchor="end">0.2</text>
+<text x="28" y="232" text-anchor="end">0.4</text>
+<text x="28" y="168" text-anchor="end">0.6</text>
+<text x="28" y="104" text-anchor="end">0.8</text>
+<text x="28" y="40" text-anchor="end">1.0</text>
+<text x="109.5" y="374" text-anchor="middle">1</text>
+<text x="256.5" y="374" text-anchor="middle">2</text>
+<text x="403.5" y="374" text-anchor="middle">3</text>
+<text x="550.5" y="374" text-anchor="middle">4</text>
+<text x="50" y="392">roc_auc</text>
+<text x="200" y="392">accuracy</text>
+<text x="350" y="392">f1</text>
+</g>
+<rect x="50.7" y="63.52" width="39.2" height="292.48" fill="var(--series-1, #0550ae)"/>
+<rect x="89.9" y="100" width="39.2" height="256" fill="var(--series-2, #bc4c00)"/>
+<rect x="129.1" y="96.8" width="39.2" height="259.2" fill="var(--series-3, #1a7f37)"/>
+<rect x="197.7" y="47.84" width="39.2" height="308.16" fill="var(--series-1, #0550ae)"/>
+<rect x="236.9" y="65.76" width="39.2" height="290.24" fill="var(--series-2, #bc4c00)"/>
+<rect x="276.1" y="61.28" width="39.2" height="294.72" fill="var(--series-3, #1a7f37)"/>
+<rect x="344.7" y="52.96" width="39.2" height="303.04" fill="var(--series-1, #0550ae)"/>
+<rect x="383.9" y="83.04" width="39.2" height="272.96" fill="var(--series-2, #bc4c00)"/>
+<rect x="423.1" y="76.32" width="39.2" height="279.68" fill="var(--series-3, #1a7f37)"/>
+<rect x="491.7" y="54.56" width="39.2" height="301.44" fill="var(--series-1, #0550ae)"/>
+<rect x="530.9" y="78.56" width="39.2" height="277.44" fill="var(--series-2, #bc4c00)"/>
+<rect x="570.1" y="76.96" width="39.2" height="279.04" fill="var(--series-3, #1a7f37)"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+<rect x="186" y="383" width="10" height="10" fill="var(--series-2, #bc4c00)"/>
+<rect x="336" y="383" width="10" height="10" fill="var(--series-3, #1a7f37)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x fold --y roc_auc,accuracy,f1 --with bars --term svg --title 'Cross-validation by fold' &lt; folds.csv</code> <a href="data/folds.csv">the table</a> <a href="gallery/grouped.svg">the svg</a></p>
+</figure>
+<figure id="forest">
+<h3>Intervals: an estimate and its half-width, with the zero line</h3>
+<p>Points with <code>--yerr</code> and <code>--hline 0</code>: the shape of the intervals <code>stats test</code> prints (an estimate, and low and high, here as a half-width). The x is the number of the test: names on a point chart wait for categories outside bars.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Difference of means, 95% intervals: 1 series, 4 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 52 36 V 356 H 624"/>
+<path d="M 52 356 h-4"/>
+<path d="M 52 310.29 h-4"/>
+<path d="M 52 264.57 h-4"/>
+<path d="M 52 218.86 h-4"/>
+<path d="M 52 173.14 h-4"/>
+<path d="M 52 127.43 h-4"/>
+<path d="M 52 81.71 h-4"/>
+<path d="M 52 36 h-4"/>
+<path d="M 52 356 v4"/>
+<path d="M 147.33 356 v4"/>
+<path d="M 242.67 356 v4"/>
+<path d="M 338 356 v4"/>
+<path d="M 433.33 356 v4"/>
+<path d="M 528.67 356 v4"/>
+<path d="M 624 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Difference of means, 95% intervals</text>
+<text x="44" y="360" text-anchor="end">-0.15</text>
+<text x="44" y="314.29" text-anchor="end">-0.10</text>
+<text x="44" y="268.57" text-anchor="end">-0.05</text>
+<text x="44" y="222.86" text-anchor="end">0.00</text>
+<text x="44" y="177.14" text-anchor="end">0.05</text>
+<text x="44" y="131.43" text-anchor="end">0.10</text>
+<text x="44" y="85.71" text-anchor="end">0.15</text>
+<text x="44" y="40" text-anchor="end">0.20</text>
+<text x="52" y="374" text-anchor="middle">1.0</text>
+<text x="147.33" y="374" text-anchor="middle">1.5</text>
+<text x="242.67" y="374" text-anchor="middle">2.0</text>
+<text x="338" y="374" text-anchor="middle">2.5</text>
+<text x="433.33" y="374" text-anchor="middle">3.0</text>
+<text x="528.67" y="374" text-anchor="middle">3.5</text>
+<text x="624" y="374" text-anchor="middle">4.0</text>
+<text x="66" y="392">difference</text>
+</g>
+<path d="M 52 218.86 H 624" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3"/>
+<path d="M 52 270.97 h0 M 242.67 207.89 h0 M 433.33 123.77 h0 M 624 238.06 h0" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="4" stroke-linecap="round"/>
+<path d="M 52 214.29 V 327.66 M 49 214.29 h6 M 49 327.66 h6 M 242.67 170.4 V 245.37 M 239.67 170.4 h6 M 239.67 245.37 h6 M 433.33 73.49 V 174.06 M 430.33 73.49 h6 M 430.33 174.06 h6 M 624 210.63 V 265.49 M 621 210.63 h6 M 621 265.49 h6" fill="none" stroke="currentColor" stroke-width="1"/>
+<rect x="52" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x test --y difference --yerr half --term svg --title 'Difference of means, 95% intervals' --hline 0 &lt; forest.csv</code> <a href="data/forest.csv">the table</a> <a href="gallery/forest.svg">the svg</a></p>
+</figure>
+<figure id="barstext">
+<h3>Bars as text</h3>
+<p>The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.</p>
+<pre>0.5 |
+    |      |
+0.4 |******|******
+    |******|******
+0.3 |*************
+    |*************
+    |*************
+0.2 |*************
+    |*************       |
+0.1 |************* ******|******
+    |************* ************* ******|******
+0.0 |************* ************* ******|****** ******|******
+    +--------------------------------------------------------
+           x1            x2            x3             g
+* importance
+</pre>
+<p class="cmd"><code>plot --x feature --y importance --with bars --yerr std --term dumb --size 56x12 &lt; importance.csv</code> <a href="data/importance.csv">the table</a> <a href="gallery/barstext.txt">the text</a></p>
+</figure>
 <figure id="text">
 <h3>The same chart as text</h3>
 <p><code>--term dumb</code> draws in characters: for a terminal, a log, or a test. The same table as the first chart, lines joined with integers only.</p>
@@ -372,7 +535,7 @@ $ plot ticks 0 1000000
 </code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Not built yet: bars, histograms, error bars, a gnuplot-like script, PNG. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Not built yet: histograms, box plots, heatmaps, ROC and other curves, reading the JSON of <code>stats</code> and <code>ml</code> directly, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

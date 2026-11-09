@@ -281,3 +281,24 @@ Y(v) and Y(0) and the height their difference; the rects come after the annotati
 
 **Gate.** `cancho test`, as section 18: hand-worked charts for both terminals (one series, two series, a negative bar, error bars on bars and on points, a category label that is dropped), every new refusal, and the
 size edges; then the throwaway mutant measurement of section 18 on the new code, with the rate stated.
+
+## 21. Slice 5a, built [measured]
+
+`--with bars` and `--yerr` as section 20 says, in both terminals, through the same functions as before: `chart.draw` reads a category's label as text (`cs`, the spans of the labels) and the half-lengths after the series
+(`ys` holds the k series and then the k columns of errors), `axis.extent` includes 0 for bars and value +- err, `dumb.slot` places a group of bars, and `svg.render` draws the rects and the one path of error bars for each series.
+**No Python was added.** `ac` grew from 4 to 8 integers (`ac[4]` bars, `ac[5]` the number of error series), so every `alloc_slice[r](4, 0)` of the tests became 8; the one stale assertion in `check_dumb.py` (`--with bars` is now valid,
+so the refusal uses `pie`) was changed in place.
+
+**Tests:** 17 new `cancho test` cases in `tests/plot_test.cho`, every chart worked out by hand from the rules and then compared with the program: one series, error bars on bars, grouped, a negative bar, a slot exactly as wide as the
+series (no gap), cut and dropped labels, the width refusals, error bars on points in both terminals, the svg rects and paths with their numbers (65.4, 235.2, ...), every refusal. Writing them found nothing wrong in the program,
+and one of my hand-derived expectations wrong (I had used a bar of 2 for a table that says 1.5); the program was right.
+
+**Measured, as in section 18:** 42 mutants of the new code against the cancho tests alone: the first tests killed 35; the 7 survivors were a slot as wide as the series, a label of exactly 11 bytes, a baseline that is a row off, an `--yerr` with
+more columns than series, and a bar of exactly one pixel; with a test for each, **40 of 42 are killed** and the 2 left are equivalent: `xs[row] = float_of(row)` (for bars `xs` is only used for the range guard) and the svg label
+cut written as `if ln > 9 { ln = 10; }` (a mutant of the condition only, which cannot change what the body gives for 10 and 11).
+
+**Limits.** A point chart still needs a numeric x: a forest plot with the names of the tests on x waits for categories outside bars (the gallery's uses the number of the test). Horizontal bars (long names) and asymmetric intervals
+(`--ylo`, `--yhi`) are not built. The category slot is the row, so a table must be in the order to draw.
+
+**Gallery:** four charts were added (permutation importance with error bars, grouped bars of cross-validation folds, an interval plot with the zero line, bars as text); their data have the shape `ml importance`, `ml cv` and
+`stats test` print, written by `make_gallery.py`, not read from those tools: reading their JSON is slice (b).

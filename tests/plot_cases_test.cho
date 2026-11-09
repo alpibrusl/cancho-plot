@@ -21,7 +21,7 @@ fn chart_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: 
     var out = buffer.empty(heap, 1);
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](4, 0);
+        let ac = alloc_slice[r](8, 0);
         ann[0] = vl;
         ann[8] = hl;
         ann[16] = lo;
@@ -30,7 +30,7 @@ fn chart_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: 
         ac[1] = nh;
         ac[2] = nb;
         ac[3] = diag;
-        let (code, line, chart) = chart.draw(heap, table, "x", ycols, w, hh, title, has_title, lines, false, ann, ac);
+        let (code, line, chart) = chart.draw(heap, table, "x", ycols, "", w, hh, title, has_title, lines, false, ann, ac);
         test.assert(code == 0);
         buffer.drop(heap, out);
         out = chart;

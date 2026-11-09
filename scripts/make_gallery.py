@@ -48,7 +48,10 @@ def datasets():
     five = ["x,a,b,c,d,e"]
     for x in range(20):
         five.append("%d,%d,%d,%d,%d,%d" % (x, x, 2 * x - 5, (x * x) // 8, 20 - x, 8 + (3 * x) % 11))
-    return {"net.csv": "\n".join(net) + "\n", "calibration.csv": "\n".join(cal) + "\n", "estimate.csv": "\n".join(est) + "\n", "five.csv": "\n".join(five) + "\n"}
+    imp = "feature,importance,std\nx1,0.391,0.026\nx2,0.118,0.019\nx3,0.052,0.011\ng,0.007,0.004\n"
+    folds = "fold,roc_auc,accuracy,f1\n1,0.914,0.800,0.810\n2,0.963,0.907,0.921\n3,0.947,0.853,0.874\n4,0.942,0.867,0.872\n"
+    forest = "test,difference,half\n1,-0.057,0.062\n2,0.012,0.041\n3,0.104,0.055\n4,-0.021,0.030\n"
+    return {"net.csv": "\n".join(net) + "\n", "calibration.csv": "\n".join(cal) + "\n", "estimate.csv": "\n".join(est) + "\n", "five.csv": "\n".join(five) + "\n", "importance.csv": imp, "folds.csv": folds, "forest.csv": forest}
 
 
 # (id, title, text under it, data file, arguments, output kind)
@@ -68,6 +71,18 @@ GALLERY = [
     ("real", "A real series: 302 days of a holdout's margin",
      "The daily margin per hotel of a holdout in a simulated metasearch-bidding run (400 hotels, 330 days). Points, as they are; 302 rows, one second of work.",
      "holdout.csv", ["--x", "day", "--y", "margin", "--term", "svg", "--title", "Holdout margin per hotel-day"], "svg"),
+    ("bars", "Bars with error bars: permutation importance",
+     "The shape of what <code>ml importance</code> prints: a category on x (the cell's text), the importance as the bar, its standard deviation as the error bar (<code>--yerr std</code>). The y range includes 0.",
+     "importance.csv", ["--x", "feature", "--y", "importance", "--with", "bars", "--yerr", "std", "--term", "svg", "--title", "Permutation importance (roc_auc)"], "svg"),
+    ("grouped", "Grouped bars: three metrics in four folds",
+     "Several series are grouped side by side in the order of <code>--y</code>: the metrics of each fold of <code>ml cv</code>.",
+     "folds.csv", ["--x", "fold", "--y", "roc_auc,accuracy,f1", "--with", "bars", "--term", "svg", "--title", "Cross-validation by fold"], "svg"),
+    ("forest", "Intervals: an estimate and its half-width, with the zero line",
+     "Points with <code>--yerr</code> and <code>--hline 0</code>: the shape of the intervals <code>stats test</code> prints (an estimate, and low and high, here as a half-width). The x is the number of the test: names on a point chart wait for categories outside bars.",
+     "forest.csv", ["--x", "test", "--y", "difference", "--yerr", "half", "--term", "svg", "--title", "Difference of means, 95% intervals", "--hline", "0"], "svg"),
+    ("barstext", "Bars as text",
+     "The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.",
+     "importance.csv", ["--x", "feature", "--y", "importance", "--with", "bars", "--yerr", "std", "--term", "dumb", "--size", "56x12"], "txt"),
     ("text", "The same chart as text",
      "<code>--term dumb</code> draws in characters: for a terminal, a log, or a test. The same table as the first chart, lines joined with integers only.",
      "net.csv", ["--x", "day", "--y", "control,treated", "--with", "lines", "--term", "dumb", "--size", "72x16", "--vline", "30"], "txt"),
@@ -178,7 +193,7 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 <pre><code>@TICKS@</code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Not built yet: bars, histograms, error bars, a gnuplot-like script, PNG. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Not built yet: histograms, box plots, heatmaps, ROC and other curves, reading the JSON of <code>stats</code> and <code>ml</code> directly, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

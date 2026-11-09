@@ -89,7 +89,7 @@ fn stroke[&h](heap: &!h Heap, b: buffer.Buffer, j: int) -> [heap] buffer.Buffer 
 }
 
 // Answers (code, document): code 0, or 9 when the plot area would be under 20 wide or high.
-pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, ann: &e [float], ac: &f [int]) -> [heap] (int, buffer.Buffer) {
+pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, k: int, ns: &c [int], ne: &d [int], cs: &g2 [int], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, ann: &e [float], ac: &f [int]) -> [heap] (int, buffer.Buffer) {
     let (xlo, xhi, ylo, yhi) = axis.extent(xs, ys, n, k, ann, ac);
     var i = 0;
     let (xl0, xh0, xok) = axis.fix(xlo, xhi);
@@ -123,6 +123,12 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte
     let y1f = float_of(y1);
     let pw = float_of(x1 - x0);
     let ph = float_of(y2 - y1);
+    // bars: the slot of a category, and a bar of at least a pixel (section 20)
+    let sws = pw / float_of(n);
+    let bwid = 0.8 * sws / float_of(k);
+    if ac[4] == 1 && bwid < 1.0 {
+        return (9, out);
+    }
     out = put(heap, out, "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ");
     out = numi(heap, out, w);
     out = put(heap, out, " ");
@@ -164,7 +170,22 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte
         out = nl(heap, out);
         q = q + 1;
     }
+    if ac[4] == 1 {
+        var ci = 0;
+        while ci < n {
+            out = put(heap, out, "<path d=\"M ");
+            out = num(heap, out, x0f + (float_of(ci) + 0.5) * sws);
+            out = put(heap, out, " ");
+            out = numi(heap, out, y2);
+            out = put(heap, out, " v4\"/>");
+            out = nl(heap, out);
+            ci = ci + 1;
+        }
+    }
     q = xk0;
+    if ac[4] == 1 {
+        q = xk1 + 1;
+    }
     while q <= xk1 {
         let xx = x0f + (ticks.value(q, xm, xe) - xlo2) / (xhi2 - xlo2) * pw;
         out = put(heap, out, "<path d=\"M ");
@@ -202,7 +223,33 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte
     }
     var prev = 0.0;
     var have_prev = false;
+    if ac[4] == 1 {
+        var ci = 0;
+        while ci < n {
+            var ln = cs[2 * ci + 1] - cs[2 * ci];
+            if ln > 10 {
+                ln = 10;
+            }
+            let xx = x0f + (float_of(ci) + 0.5) * sws;
+            if !have_prev || xx - prev >= 8.0 * float_of(ln + 1) {
+                out = put(heap, out, "<text x=\"");
+                out = num(heap, out, xx);
+                out = put(heap, out, "\" y=\"");
+                out = numi(heap, out, y2 + 18);
+                out = put(heap, out, "\" text-anchor=\"middle\">");
+                out = esc(heap, out, text[cs[2 * ci]..cs[2 * ci] + ln]);
+                out = put(heap, out, "</text>");
+                out = nl(heap, out);
+                prev = xx;
+                have_prev = true;
+            }
+            ci = ci + 1;
+        }
+    }
     q = xk0;
+    if ac[4] == 1 {
+        q = xk1 + 1;
+    }
     while q <= xk1 {
         let xx = x0f + (ticks.value(q, xm, xe) - xlo2) / (xhi2 - xlo2) * pw;
         let (lb, ln) = axis.used(ticks.label(heap, buffer.empty(heap, 16), q, xm, xe));
@@ -301,43 +348,115 @@ pub fn render[&h, &t, &a, &b, &c, &d, &z, &e, &f](heap: &!h Heap, text: &t [byte
         out = nl(heap, out);
     }
     j = 0;
-    while j < k {
+    if ac[4] == 1 {
+        // bars: a rect for each, from Y(0) to Y(v) (section 20)
+        let y0 = y1f + (yhi2 - 0.0) / (yhi2 - ylo2) * ph;
+        var ci = 0;
+        while ci < n {
+            j = 0;
+            while j < k {
+                let yv = y1f + (yhi2 - ys[j * n + ci]) / (yhi2 - ylo2) * ph;
+                var top = yv;
+                var diff = y0 - yv;
+                if y0 < yv {
+                    top = y0;
+                    diff = yv - y0;
+                }
+                out = put(heap, out, "<rect x=\"");
+                out = num(heap, out, x0f + float_of(ci) * sws + 0.1 * sws + float_of(j) * bwid);
+                out = put(heap, out, "\" y=\"");
+                out = num(heap, out, top);
+                out = put(heap, out, "\" width=\"");
+                out = num(heap, out, bwid);
+                out = put(heap, out, "\" height=\"");
+                out = num(heap, out, diff);
+                out = put(heap, out, "\" fill=\"var(--series-");
+                out = buffer.push_nat(heap, out, j + 1);
+                out = put(heap, out, ", #");
+                out = put(heap, out, color(j));
+                out = put(heap, out, ")\"/>");
+                out = nl(heap, out);
+                j = j + 1;
+            }
+            ci = ci + 1;
+        }
+    } else {
+        while j < k {
+            out = put(heap, out, "<path d=\"");
+            i = 0;
+            while i < n {
+                let px = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
+                let py = y1f + (yhi2 - ys[j * n + i]) / (yhi2 - ylo2) * ph;
+                if lines {
+                    if i == 0 {
+                        out = put(heap, out, "M ");
+                    } else {
+                        out = put(heap, out, " L ");
+                    }
+                    out = num(heap, out, px);
+                    out = put(heap, out, " ");
+                    out = num(heap, out, py);
+                } else {
+                    if i > 0 {
+                        out = put(heap, out, " ");
+                    }
+                    out = put(heap, out, "M ");
+                    out = num(heap, out, px);
+                    out = put(heap, out, " ");
+                    out = num(heap, out, py);
+                    out = put(heap, out, " h0");
+                }
+                i = i + 1;
+            }
+            if lines && n == 1 {
+                out = put(heap, out, " h0");
+            }
+            out = put(heap, out, "\"");
+            out = stroke(heap, out, j);
+            if lines {
+                out = put(heap, out, " stroke-width=\"1.5\" stroke-linecap=\"round\"/>");
+            } else {
+                out = put(heap, out, " stroke-width=\"4\" stroke-linecap=\"round\"/>");
+            }
+            out = nl(heap, out);
+            j = j + 1;
+        }
+    }
+    // error bars (section 20): a path for each series, a whisker and two caps for each point
+    j = 0;
+    while j < ac[5] {
         out = put(heap, out, "<path d=\"");
         i = 0;
         while i < n {
-            let px = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
-            let py = y1f + (yhi2 - ys[j * n + i]) / (yhi2 - ylo2) * ph;
-            if lines {
-                if i == 0 {
-                    out = put(heap, out, "M ");
-                } else {
-                    out = put(heap, out, " L ");
-                }
-                out = num(heap, out, px);
-                out = put(heap, out, " ");
-                out = num(heap, out, py);
-            } else {
-                if i > 0 {
-                    out = put(heap, out, " ");
-                }
-                out = put(heap, out, "M ");
-                out = num(heap, out, px);
-                out = put(heap, out, " ");
-                out = num(heap, out, py);
-                out = put(heap, out, " h0");
+            let v = ys[j * n + i];
+            let er = ys[(k + j) * n + i];
+            var cx = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
+            if ac[4] == 1 {
+                cx = x0f + float_of(i) * sws + 0.1 * sws + float_of(j) * bwid + bwid / 2.0;
             }
+            let yt = y1f + (yhi2 - (v + er)) / (yhi2 - ylo2) * ph;
+            let yb = y1f + (yhi2 - (v - er)) / (yhi2 - ylo2) * ph;
+            if i > 0 {
+                out = put(heap, out, " ");
+            }
+            out = put(heap, out, "M ");
+            out = num(heap, out, cx);
+            out = put(heap, out, " ");
+            out = num(heap, out, yt);
+            out = put(heap, out, " V ");
+            out = num(heap, out, yb);
+            out = put(heap, out, " M ");
+            out = num(heap, out, cx - 3.0);
+            out = put(heap, out, " ");
+            out = num(heap, out, yt);
+            out = put(heap, out, " h6 M ");
+            out = num(heap, out, cx - 3.0);
+            out = put(heap, out, " ");
+            out = num(heap, out, yb);
+            out = put(heap, out, " h6");
             i = i + 1;
         }
-        if lines && n == 1 {
-            out = put(heap, out, " h0");
-        }
-        out = put(heap, out, "\"");
-        out = stroke(heap, out, j);
-        if lines {
-            out = put(heap, out, " stroke-width=\"1.5\" stroke-linecap=\"round\"/>");
-        } else {
-            out = put(heap, out, " stroke-width=\"4\" stroke-linecap=\"round\"/>");
-        }
+        out = put(heap, out, "\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\"/>");
         out = nl(heap, out);
         j = j + 1;
     }

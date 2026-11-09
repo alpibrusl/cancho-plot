@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Cross-validation by fold: 3 series, 4 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 109.5 356 v4"/>
+<path d="M 256.5 356 v4"/>
+<path d="M 403.5 356 v4"/>
+<path d="M 550.5 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Cross-validation by fold</text>
+<text x="28" y="360" text-anchor="end">0.0</text>
+<text x="28" y="296" text-anchor="end">0.2</text>
+<text x="28" y="232" text-anchor="end">0.4</text>
+<text x="28" y="168" text-anchor="end">0.6</text>
+<text x="28" y="104" text-anchor="end">0.8</text>
+<text x="28" y="40" text-anchor="end">1.0</text>
+<text x="109.5" y="374" text-anchor="middle">1</text>
+<text x="256.5" y="374" text-anchor="middle">2</text>
+<text x="403.5" y="374" text-anchor="middle">3</text>
+<text x="550.5" y="374" text-anchor="middle">4</text>
+<text x="50" y="392">roc_auc</text>
+<text x="200" y="392">accuracy</text>
+<text x="350" y="392">f1</text>
+</g>
+<rect x="50.7" y="63.52" width="39.2" height="292.48" fill="var(--series-1, #0550ae)"/>
+<rect x="89.9" y="100" width="39.2" height="256" fill="var(--series-2, #bc4c00)"/>
+<rect x="129.1" y="96.8" width="39.2" height="259.2" fill="var(--series-3, #1a7f37)"/>
+<rect x="197.7" y="47.84" width="39.2" height="308.16" fill="var(--series-1, #0550ae)"/>
+<rect x="236.9" y="65.76" width="39.2" height="290.24" fill="var(--series-2, #bc4c00)"/>
+<rect x="276.1" y="61.28" width="39.2" height="294.72" fill="var(--series-3, #1a7f37)"/>
+<rect x="344.7" y="52.96" width="39.2" height="303.04" fill="var(--series-1, #0550ae)"/>
+<rect x="383.9" y="83.04" width="39.2" height="272.96" fill="var(--series-2, #bc4c00)"/>
+<rect x="423.1" y="76.32" width="39.2" height="279.68" fill="var(--series-3, #1a7f37)"/>
+<rect x="491.7" y="54.56" width="39.2" height="301.44" fill="var(--series-1, #0550ae)"/>
+<rect x="530.9" y="78.56" width="39.2" height="277.44" fill="var(--series-2, #bc4c00)"/>
+<rect x="570.1" y="76.96" width="39.2" height="279.04" fill="var(--series-3, #1a7f37)"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+<rect x="186" y="383" width="10" height="10" fill="var(--series-2, #bc4c00)"/>
+<rect x="336" y="383" width="10" height="10" fill="var(--series-3, #1a7f37)"/>
+</svg>

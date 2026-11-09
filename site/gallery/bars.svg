@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="Permutation importance (roc_auc): 1 series, 4 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 109.5 356 v4"/>
+<path d="M 256.5 356 v4"/>
+<path d="M 403.5 356 v4"/>
+<path d="M 550.5 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">Permutation importance (roc_auc)</text>
+<text x="28" y="360" text-anchor="end">0.0</text>
+<text x="28" y="296" text-anchor="end">0.1</text>
+<text x="28" y="232" text-anchor="end">0.2</text>
+<text x="28" y="168" text-anchor="end">0.3</text>
+<text x="28" y="104" text-anchor="end">0.4</text>
+<text x="28" y="40" text-anchor="end">0.5</text>
+<text x="109.5" y="374" text-anchor="middle">x1</text>
+<text x="256.5" y="374" text-anchor="middle">x2</text>
+<text x="403.5" y="374" text-anchor="middle">x3</text>
+<text x="550.5" y="374" text-anchor="middle">g</text>
+<text x="50" y="392">importance</text>
+</g>
+<rect x="50.7" y="105.76" width="117.6" height="250.24" fill="var(--series-1, #0550ae)"/>
+<rect x="197.7" y="280.48" width="117.6" height="75.52" fill="var(--series-1, #0550ae)"/>
+<rect x="344.7" y="322.72" width="117.6" height="33.28" fill="var(--series-1, #0550ae)"/>
+<rect x="491.7" y="351.52" width="117.6" height="4.48" fill="var(--series-1, #0550ae)"/>
+<path d="M 109.5 89.12 V 122.4 M 106.5 89.12 h6 M 106.5 122.4 h6 M 256.5 268.32 V 292.64 M 253.5 268.32 h6 M 253.5 292.64 h6 M 403.5 315.68 V 329.76 M 400.5 315.68 h6 M 400.5 329.76 h6 M 550.5 348.96 V 354.08 M 547.5 348.96 h6 M 547.5 354.08 h6" fill="none" stroke="currentColor" stroke-width="1"/>
+<rect x="36" y="383" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
