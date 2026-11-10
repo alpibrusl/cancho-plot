@@ -1,0 +1,174 @@
+edition 9;
+
+// Horizontal bars (docs/design.md section 35): hand-worked charts in both terminals and every refusal. Run by `cancho test` with lib/plot/*.cho.
+import plot.chart;
+import std.buffer;
+import std.bytes;
+import std.test;
+
+fn sample() -> [] &static [byte] {
+    return "feature,a,b\nage,12,7\nincome,30.5,22\nzip,3,9\n";
+}
+
+// the chart of `table` (categories in `feature`, series `ycols`), `w` by `hh`; the markers (nv vlines) and the diagonal as asked; (code, line, chart)
+fn hbars[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], svg_term: bool, w: int, hh: int, title: &static [byte], has_title: bool, nv: int, diag: int, yerr: &static [byte], xhi: &static [byte]) -> [heap] (int, int, buffer.Buffer) {
+    var rc = 0;
+    var rl = 0;
+    var rb = buffer.empty(heap, 1);
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](9, 0);
+        ac[4] = 5;
+        ac[0] = nv;
+        ac[3] = diag;
+        if len(yerr) > 0 {
+            ac[5] = 1;
+        }
+        let (code, line, out) = chart.draw(heap, table, "feature", ycols, yerr, "", xhi, w, hh, title, has_title, false, svg_term, ann, ac);
+        rc = code;
+        rl = line;
+        buffer.drop(heap, rb);
+        rb = out;
+    }
+    return (rc, rl, rb);
+}
+
+fn chart_is[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: int, hh: int, title: &static [byte], has_title: bool, want: &static [byte]) -> [heap] int {
+    let (code, line, out) = hbars(heap, table, ycols, false, w, hh, title, has_title, 0, 0, "", "");
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.equal(buffer.bytes(g), want);
+    }
+    buffer.drop(heap, out);
+    return test.assert(ok);
+}
+
+fn refused[&h, &t](heap: &!h Heap, table: &t [byte], svg_term: bool, w: int, hh: int, nv: int, diag: int, yerr: &static [byte], xhi: &static [byte], want: int, want_line: int) -> [heap] int {
+    let (code, line, out) = hbars(heap, table, "a", svg_term, w, hh, "", false, nv, diag, yerr, xhi);
+    buffer.drop(heap, out);
+    test.assert(code == want);
+    return test.assert(line == want_line);
+}
+
+fn test_dumb_two_series_with_title[&h](heap: &!h Heap) -> [heap] int {
+    // the ticks run 0 to 35 over 40 columns: 12 is 13 columns, 30.5 is 34, 3 is 3, 7 is 8, 22 is 25, 9 is 10
+    chart_is(heap, sample(), "a,b", 40, 9, "Importance", true, "                       Importance\n   age |*************\n       |++++++++\nincome |**********************************\n       |+++++++++++++++++++++++++\n   zip |***\n       |++++++++++\n       +----------------------------------------\n        0    5    10    15   20    25    30   35\n* a  + b\n");
+    return 0;
+}
+
+fn test_dumb_one_series_thick_bars[&h](heap: &!h Heap) -> [heap] int {
+    // 6 rows for 2 categories: each bar is 3 rows high, the label on the first; 10 of 10 ticks wide is full width
+    chart_is(heap, "feature,v\none,5\ntwo,10\n", "v", 20, 6, "", false, "one |**********\n    |**********\n    |**********\ntwo |********************\n    |********************\n    |********************\n    +--------------------\n     0   2   4   6   8 10\n* v\n");
+    return 0;
+}
+
+fn test_dumb_tiny_and_zero_values[&h](heap: &!h Heap) -> [heap] int {
+    // a value that is above 0 has one column at least; a 0 has none
+    chart_is(heap, "feature,v\na,0\nb,0.001\nc,100\n", "v", 30, 6, "", false, "a |\n  |\nb |*\n  |*\nc |******************************\n  |******************************\n  +------------------------------\n   0    20    40    60    80  100\n* v\n");
+    return 0;
+}
+
+fn test_dumb_all_zero_and_long_label[&h](heap: &!h Heap) -> [heap] int {
+    // every value 0: the axis is 0 to 1; a label is cut to 10 bytes
+    chart_is(heap, "feature,v\nabcdefghijklmnop,0\n", "v", 20, 5, "", false, "abcdefghij |\n           |\n           |\n           |\n           |\n           +--------------------\n            0.0    0.4 0.6 0.8\n* v\n");
+    return 0;
+}
+
+fn test_svg_geometry[&h](heap: &!h Heap) -> [heap] int {
+    let (code, line, out) = hbars(heap, sample(), "a,b", true, 640, 400, "", false, 0, 0, "", "");
+    test.assert(code == 0);
+    borrow out as &g in {
+        let b = buffer.bytes(g);
+        // x0 = 12 + 8 * 6 (income), plot width 564, three rows of 114.67, two bars of 45.87 in 80% of a row
+        test.assert(bytes.find(b, "<rect x=\"60\" y=\"23.47\" width=\"193.37\" height=\"45.87\" fill=\"var(--series-1, #0550ae)\"/>") >= 0);
+        test.assert(bytes.find(b, "<rect x=\"60\" y=\"69.33\" width=\"112.8\" height=\"45.87\" fill=\"var(--series-2, #bc4c00)\"/>") >= 0);
+        test.assert(bytes.find(b, "<text x=\"52\" y=\"73.33\" text-anchor=\"end\">age</text>") >= 0);
+        test.assert(bytes.find(b, "<text x=\"60\" y=\"374\" text-anchor=\"middle\">0</text>") >= 0);
+        test.assert(bytes.find(b, "<text x=\"624\" y=\"374\" text-anchor=\"middle\">35</text>") >= 0);
+        test.assert(bytes.find(b, "aria-label=\"2 series, 3 categories, horizontal bars\"") >= 0);
+    }
+    buffer.drop(heap, out);
+    return 0;
+}
+
+fn test_refusals[&h](heap: &!h Heap) -> [heap] int {
+    refused(heap, "feature,a\nx,1\ny,-2\n", false, 40, 8, 0, 0, "", "", 21, 3);
+    refused(heap, "feature,a\nx,-0.5\n", true, 640, 400, 0, 0, "", "", 21, 2);
+    refused(heap, "feature,a\nx,1\n", false, 40, 8, 1, 0, "", "", 11, 0);
+    refused(heap, "feature,a\nx,1\n", false, 40, 8, 0, 1, "", "", 11, 0);
+    refused(heap, "feature,a\nx,1\n", false, 40, 8, 0, 0, "a", "", 11, 0);
+    refused(heap, "feature,a\nx,1\n", false, 40, 8, 0, 0, "", "a", 11, 0);
+    refused(heap, "feature,a\nx,z\n", false, 40, 8, 0, 0, "", "", 2, 2);
+    refused(heap, "feature,a\nx,1\n", false, 40, 8, 0, 0, "", "", 0, 0);
+    // three bars and 2 rows: a bar is under a row
+    refused(heap, "feature,a\nx,1\ny,2\nz,3\n", false, 40, 2, 0, 0, "", "", 9, 0);
+    refused(heap, "feature,a\nx,1\ny,2\nz,3\n", false, 40, 3, 0, 0, "", "", 0, 0);
+    return 0;
+}
+
+fn test_svg_bar_under_a_pixel[&h](heap: &!h Heap) -> [heap] int {
+    var t = buffer.append(heap, buffer.empty(heap, 64), "feature,a\n");
+    var i = 0;
+    while i < 60 {
+        t = buffer.append(heap, t, "c,1\n");
+        i = i + 1;
+    }
+    borrow t as &g in {
+        // the plot area is 44 high: 60 rows leave 0.73 pixel for a bar
+        refused(heap, buffer.bytes(g), true, 300, 100, 0, 0, "", "", 9, 0);
+        refused(heap, buffer.bytes(g), true, 300, 140, 0, 0, "", "", 0, 0);
+    }
+    buffer.drop(heap, t);
+    return 0;
+}
+
+fn test_max_over_all_series_and_label_cut[&h](heap: &!h Heap) -> [heap] int {
+    // the second series holds the greatest value: the axis runs to 8, so 4 is half of 16 columns
+    chart_is(heap, "feature,a,b\nx,1,8\ny,4,2\n", "a,b", 16, 5, "", false, "x |**\n  |++++++++++++++++\ny |********\n  |++++\n  +----------------\n   0 1 2 3 4 5 6 7\n* a  + b\n");
+    // a label of 11 bytes is cut to 10 (the gutter is 10 wide)
+    chart_is(heap, "feature,a\nabcdefghijk,1\n", "a", 10, 5, "", false, "abcdefghij |**********\n           |**********\n           |**********\n           |**********\n           |**********\n           +----------\n            0.0  0.6\n* a\n");
+    return 0;
+}
+
+fn test_slack_of_a_float_that_falls_short[&h](heap: &!h Heap) -> [heap] int {
+    // 0.29 * 100 is 28.999999999999996 in a double: the bar is 29 columns
+    let (code, line, out) = hbars(heap, "feature,a\nx,0.29\ny,1\n", "a", false, 100, 10, "", false, 0, 0, "", "");
+    test.assert(code == 0);
+    borrow out as &g in {
+        test.assert(bytes.starts_with(buffer.bytes(g), "x |*****************************\n"));
+        test.assert(bytes.starts_with(buffer.bytes(g), "x |******************************") == false);
+    }
+    buffer.drop(heap, out);
+    return 0;
+}
+
+fn test_svg_size_edges_legend_and_range[&h](heap: &!h Heap) -> [heap] int {
+    // a gutter of 1: the plot is 56 - 16 - 20 = 20 pixels wide (enough), 55 is too narrow
+    refused(heap, "feature,a\nx,1\n", true, 56, 400, 0, 0, "", "", 0, 0);
+    refused(heap, "feature,a\nx,1\n", true, 55, 400, 0, 0, "", "", 9, 0);
+    // 20 pixels high (enough), 19 is too low
+    refused(heap, "feature,a\nx,1\n", true, 300, 76, 0, 0, "", "", 0, 0);
+    refused(heap, "feature,a\nx,1\n", true, 300, 75, 0, 0, "", "", 9, 0);
+    // 20 rows of 1.25 pixels in a plot 25 high: a bar of exactly 1 pixel is drawn
+    var t = buffer.append(heap, buffer.empty(heap, 64), "feature,a\n");
+    var i = 0;
+    while i < 20 {
+        t = buffer.append(heap, t, "c,1\n");
+        i = i + 1;
+    }
+    borrow t as &g in {
+        refused(heap, buffer.bytes(g), true, 300, 81, 0, 0, "", "", 0, 0);
+    }
+    buffer.drop(heap, t);
+    // the legend text sits 14 pixels right of its square, 8 above the bottom
+    let (code, line, out) = hbars(heap, "feature,a\nx,1\n", "a", true, 640, 400, "", false, 0, 0, "", "");
+    test.assert(code == 0);
+    borrow out as &g2 in {
+        test.assert(bytes.find(buffer.bytes(g2), "<text x=\"34\" y=\"392\">a</text>") >= 0);
+    }
+    buffer.drop(heap, out);
+    // a range the ticks cannot stand for
+    refused(heap, "feature,a\nx,1e16\n", false, 40, 8, 0, 0, "", "", 7, 0);
+    return 0;
+}

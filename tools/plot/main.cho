@@ -311,8 +311,11 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
                 } else if bytes.equal(value, "heat") {
                     lines = false;
                     ac[4] = 4;
+                } else if bytes.equal(value, "hbars") {
+                    lines = false;
+                    ac[4] = 5;
                 } else {
-                    return refuse(io, "plot.usage", "--with takes points, lines, bars, hist, box or heat", "--with bars");
+                    return refuse(io, "plot.usage", "--with takes points, lines, bars, hbars, hist, box or heat", "--with bars");
                 }
             } else if bytes.equal(flag, "--size") {
                 let (a, b) = size_of(value);
@@ -492,9 +495,11 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
             } else if code == 7 {
                 status = refuse(io, "plot.range-invalid", "a range is beyond 1e15 of zero, narrower than 1e-12, or 1e12 times narrower than its distance from zero", "plot the difference from a base value");
             } else if code == 11 {
-                status = refuse(io, "plot.usage", "--yerr, or --ylo with --yhi, needs one column for each series; --with hist needs --xhi and no intervals or categories, and --xhi only goes with hist; --with box needs five --y columns (lower, q1, median, q3, upper) and no intervals or categories; --with heat needs one --y column and --z, and no intervals or categories; --logy only goes with points or lines, with no intervals and no --diag", "--yerr e1,e2 for --y a,b; --with hist --x lo --xhi hi --y count");
+                status = refuse(io, "plot.usage", "--yerr, or --ylo with --yhi, needs one column for each series; --with hist needs --xhi and no intervals or categories, and --xhi only goes with hist; --with box needs five --y columns (lower, q1, median, q3, upper) and no intervals or categories; --with heat needs one --y column and --z, and no intervals or categories; --with hbars needs categories (one or more --y columns) and no intervals, markers or --diag; --logy only goes with points or lines, with no intervals and no --diag", "--yerr e1,e2 for --y a,b; --with hist --x lo --xhi hi --y count");
             } else if code == 19 {
                 status = refuse_line(heap, io, "plot.log-nonpositive", "a value on a log axis (a y value, an --hline or a --band end) is not above 0", "drop or shift the value, or plot without --logy", line);
+            } else if code == 21 {
+                status = refuse_line(heap, io, "plot.negative-bar", "a bar value is below 0; horizontal bars start at 0", "plot values of 0 or more, or use --with bars", line);
             } else if code == 16 {
                 status = refuse_line(heap, io, "plot.duplicate-cell", "a cell of the heatmap is given twice", "give each pair of labels once", line);
             } else if code == 8 {

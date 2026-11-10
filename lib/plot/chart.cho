@@ -5,6 +5,7 @@ module plot.chart;
 import plot.axis;
 import plot.csv;
 import plot.dumb;
+import plot.hbar;
 import plot.heat;
 import plot.num;
 import plot.svg;
@@ -117,6 +118,10 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
         return (11, 0, none);
     }
     // a log axis (section 33) is for points and lines, with no intervals and no diagonal
+    // horizontal bars (section 35): categories, no intervals, no markers, no diagonal
+    if ac[4] == 5 && (ke > 0 || len(xhi) > 0 || ac[0] + ac[1] + ac[2] + ac[3] > 0) {
+        return (11, 0, none);
+    }
     if ac[8] == 1 && (ac[4] != 0 || ke > 0 || ac[3] == 1) {
         return (11, 0, none);
     }
@@ -233,7 +238,7 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                 line = row + 2;
                             } else {
                                 let (a, b) = csv.cell(text, at, end, xcol);
-                                if ac[4] == 1 || ac[4] == 3 || ac[4] == 4 || ac[7] == 1 {
+                                if ac[4] == 1 || ac[4] == 3 || ac[4] == 4 || ac[4] == 5 || ac[7] == 1 {
                                     // a category: its label is the cell, its place the row (section 20)
                                     xs[row] = float_of(row);
                                     cl[2 * row] = a;
@@ -360,7 +365,29 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                 q = q + 1;
                             }
                         }
-                        if code == 0 && ac[4] == 4 {
+                        if code == 0 && ac[4] == 5 {
+                            // horizontal bars (section 35): the bars start at 0, so a value below it has no place
+                            var q = 0;
+                            while q < ycount * n && code == 0 {
+                                if ys[q] < 0.0 {
+                                    code = 21;
+                                    line = q % n + 2;
+                                }
+                                q = q + 1;
+                            }
+                            if code == 0 {
+                                buffer.drop(heap, out);
+                                if svg_term {
+                                    let (rc, chart) = hbar.svg_render(heap, text, ys, n, ycount, ns, ne, cl, w, hh, title, has_title);
+                                    code = rc;
+                                    out = chart;
+                                } else {
+                                    let (rc, chart) = hbar.dumb_render(heap, text, ys, n, ycount, ns, ne, cl, w, hh, title, has_title);
+                                    code = rc;
+                                    out = chart;
+                                }
+                            }
+                        } else if code == 0 && ac[4] == 4 {
                             // the categories of a heatmap, numbered by first appearance, and the cells given twice (section 29)
                             var cx = 0;
                             var cy = 0;

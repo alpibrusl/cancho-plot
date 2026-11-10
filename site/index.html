@@ -887,6 +887,65 @@ min 0.05847881882164951  max 0.7274500944994768
 </div>
 <p class="cmd"><code>plot --x iteration --y fun --by solver --with lines --logy --term svg --size 520x320 --title 'Objective by iteration' &lt; converge.csv</code> <a href="data/converge.csv">the table</a> <a href="gallery/logby.svg">the svg</a></p>
 </figure>
+<figure id="hbars">
+<h3>Horizontal bars</h3>
+<p><code>--with hbars</code>: the categories down the left (long names fit), the values along the bottom from 0. Several <code>--y</code> columns are grouped; a bar value below 0 is refused (<code>plot.negative-bar</code>).</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 300" width="520" height="300" role="img" aria-label="Permutation importance (roc_auc): 1 series, 4 categories, horizontal bars">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 28 36 V 256 H 504"/>
+<path d="M 28 256 v4"/>
+<path d="M 87.5 256 v4"/>
+<path d="M 147 256 v4"/>
+<path d="M 206.5 256 v4"/>
+<path d="M 266 256 v4"/>
+<path d="M 325.5 256 v4"/>
+<path d="M 385 256 v4"/>
+<path d="M 444.5 256 v4"/>
+<path d="M 504 256 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="260" y="20" text-anchor="middle" font-size="14">Permutation importance (roc_auc)</text>
+<text x="20" y="67.5" text-anchor="end">x1</text>
+<text x="20" y="122.5" text-anchor="end">x2</text>
+<text x="20" y="177.5" text-anchor="end">x3</text>
+<text x="20" y="232.5" text-anchor="end">g</text>
+<text x="28" y="274" text-anchor="middle">0.00</text>
+<text x="87.5" y="274" text-anchor="middle">0.05</text>
+<text x="147" y="274" text-anchor="middle">0.10</text>
+<text x="206.5" y="274" text-anchor="middle">0.15</text>
+<text x="266" y="274" text-anchor="middle">0.20</text>
+<text x="325.5" y="274" text-anchor="middle">0.25</text>
+<text x="385" y="274" text-anchor="middle">0.30</text>
+<text x="444.5" y="274" text-anchor="middle">0.35</text>
+<text x="504" y="274" text-anchor="middle">0.40</text>
+<text x="42" y="292">importance</text>
+</g>
+<rect x="28" y="41.5" width="465.29" height="44" fill="var(--series-1, #0550ae)"/>
+<rect x="28" y="96.5" width="140.42" height="44" fill="var(--series-1, #0550ae)"/>
+<rect x="28" y="151.5" width="61.88" height="44" fill="var(--series-1, #0550ae)"/>
+<rect x="28" y="206.5" width="8.33" height="44" fill="var(--series-1, #0550ae)"/>
+<rect x="28" y="283" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --x feature --y importance --with hbars --term svg --size 520x300 --title 'Permutation importance (roc_auc)' &lt; importance.csv</code> <a href="data/importance.csv">the table</a> <a href="gallery/hbars.svg">the svg</a></p>
+</figure>
+<figure id="hbarstext">
+<h3>Horizontal bars as text</h3>
+<p>The same chart with <code>--term dumb</code>: a bar is as many glyphs as its share of the axis, at least one for a value above 0.</p>
+<pre>x1 |************************************************
+   |************************************************
+x2 |**************
+   |**************
+x3 |******
+   |******
+ g |*
+   |*
+   +--------------------------------------------------
+    0.00      0.10  0.15   0.20  0.25  0.30  0.35 0.40
+* importance
+</pre>
+<p class="cmd"><code>plot --x feature --y importance --with hbars --term dumb --size 50x8 &lt; importance.csv</code> <a href="data/importance.csv">the table</a> <a href="gallery/hbarstext.txt">the text</a></p>
+</figure>
 <figure id="barstext">
 <h3>Bars as text</h3>
 <p>The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.</p>

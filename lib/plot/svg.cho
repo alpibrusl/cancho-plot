@@ -55,7 +55,7 @@ pub fn esc[&h, &t](heap: &!h Heap, b: buffer.Buffer, text: &t [byte]) -> [heap] 
     return out;
 }
 
-fn color(j: int) -> [] &static [byte] {
+pub fn color(j: int) -> [] &static [byte] {
     if j == 0 {
         return "0550ae";
     }

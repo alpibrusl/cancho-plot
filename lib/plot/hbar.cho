@@ -1,0 +1,349 @@
+edition 9;
+
+module plot.hbar;
+
+import plot.axis;
+import plot.svg;
+import plot.ticks;
+import std.buffer;
+
+// Horizontal bars (docs/design.md section 35): the categories down the left, the values along the bottom, from 0. Row r of the table is a category: cs[2r] .. cs[2r + 1] is its label's span in `text`; series j of it is ys[j n + r], which is not negative (the caller has
+// refused otherwise). ns[j] .. ne[j] is the name of series j.
+
+fn cut10(len0: int) -> [] int {
+    if len0 > 10 {
+        return 10;
+    }
+    return len0;
+}
+
+fn spaces[&h](heap: &!h Heap, b: buffer.Buffer, n: int) -> [heap] buffer.Buffer {
+    var out = b;
+    var i = 0;
+    while i < n {
+        out = buffer.push(heap, out, byte_of(' '));
+        i = i + 1;
+    }
+    return out;
+}
+
+fn flush[&h](heap: &!h Heap, out: buffer.Buffer, line: buffer.Buffer) -> [heap] buffer.Buffer {
+    var o = out;
+    borrow line as &lb in {
+        let bs = buffer.bytes(lb);
+        var n = len(bs);
+        while n > 0 && int_of(bs[n - 1]) == ' ' {
+            n = n - 1;
+        }
+        o = buffer.append(heap, o, bs[0..n]);
+    }
+    buffer.drop(heap, line);
+    return buffer.push(heap, o, byte_of(10));
+}
+
+// the greatest value, or 1 when every value is 0; and the width of the label gutter
+fn extent[&b, &c](ys: &b [float], cs: &c [int], n: int, k: int) -> [] (float, int) {
+    var top = 0.0;
+    var i = 0;
+    while i < n * k {
+        if ys[i] > top {
+            top = ys[i];
+        }
+        i = i + 1;
+    }
+    if top == 0.0 {
+        top = 1.0;
+    }
+    var g = 0;
+    i = 0;
+    while i < n {
+        let ln = cut10(cs[2 * i + 1] - cs[2 * i]);
+        if ln > g {
+            g = ln;
+        }
+        i = i + 1;
+    }
+    return (top, g);
+}
+
+// The chart as text: answers (code, chart); code 9 when a bar would be under a row or the axis under a column, 7 when the range is one the ticks cannot stand for.
+pub fn dumb_render[&h, &t, &b, &c, &d, &e, &z](heap: &!h Heap, text: &t [byte], ys: &b [float], n: int, k: int, ns: &d [int], ne: &e [int], cs: &c [int], w: int, hh: int, title: &z [byte], has_title: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 2048);
+    let bt = hh / (n * k);
+    if bt < 1 {
+        return (9, out);
+    }
+    let (top, g) = extent(ys, cs, n, k);
+    let (lo, hi, ok) = axis.fix(0.0, top);
+    if !ok {
+        return (7, out);
+    }
+    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(0.0, top, 6, false);
+    let glyphs = "*+xo#";
+    if has_title {
+        var tl = spaces(heap, buffer.empty(heap, 64), g + 2);
+        var pad = (w - len(title)) / 2;
+        if pad < 0 {
+            pad = 0;
+        }
+        tl = spaces(heap, tl, pad);
+        tl = buffer.append(heap, tl, title);
+        out = flush(heap, out, tl);
+    }
+    var i = 0;
+    while i < n {
+        let la = cs[2 * i];
+        let ln = cut10(cs[2 * i + 1] - la);
+        var j = 0;
+        while j < k {
+            var sub = 0;
+            while sub < bt {
+                var line = buffer.empty(heap, 64);
+                if j == 0 && sub == 0 {
+                    line = spaces(heap, line, g - ln);
+                    line = buffer.append(heap, line, text[la..la + ln]);
+                } else {
+                    line = spaces(heap, line, g);
+                }
+                line = buffer.push(heap, line, byte_of(' '));
+                line = buffer.push(heap, line, byte_of('|'));
+                let v = ys[j * n + i];
+                var len0 = truncate(v * float_of(w) / xhi2 + 1.0e-9);
+                if len0 > w {
+                    len0 = w;
+                }
+                if v > 0.0 && len0 < 1 {
+                    len0 = 1;
+                }
+                var u = 0;
+                while u < len0 {
+                    line = buffer.push(heap, line, glyphs[j]);
+                    u = u + 1;
+                }
+                out = flush(heap, out, line);
+                sub = sub + 1;
+            }
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    var ax = spaces(heap, buffer.empty(heap, 64), g + 1);
+    ax = buffer.push(heap, ax, byte_of('+'));
+    var d = 0;
+    while d < w {
+        ax = buffer.push(heap, ax, byte_of('-'));
+        d = d + 1;
+    }
+    out = flush(heap, out, ax);
+    // the labels of the ticks, centred on their columns, left out when they would touch the one before
+    var xl = buffer.empty(heap, 64);
+    var at = 0;
+    var placed = false;
+    var q = xk0;
+    while q <= xk1 {
+        let (lb, ln) = axis.used(ticks.label(heap, buffer.empty(heap, 16), q, xm, xe));
+        var col = truncate((ticks.value(q, xm, xe) - xlo2) * float_of(w) / (xhi2 - xlo2) + 1.0e-9);
+        if col > w - 1 {
+            col = w - 1;
+        }
+        var start = col - ln / 2;
+        if start > w - ln {
+            start = w - ln;
+        }
+        if start < 0 {
+            start = 0;
+        }
+        if !placed || start >= at + 1 {
+            xl = spaces(heap, xl, start - at);
+            borrow lb as &lq in {
+                xl = buffer.append(heap, xl, buffer.bytes(lq));
+            }
+            at = start + ln;
+            placed = true;
+        }
+        buffer.drop(heap, lb);
+        q = q + 1;
+    }
+    var xline = spaces(heap, buffer.empty(heap, 64), g + 2);
+    borrow xl as &xq in {
+        xline = buffer.append(heap, xline, buffer.bytes(xq));
+    }
+    buffer.drop(heap, xl);
+    out = flush(heap, out, xline);
+    var legend = buffer.empty(heap, 64);
+    var j = 0;
+    while j < k {
+        if j > 0 {
+            legend = buffer.append(heap, legend, "  ");
+        }
+        legend = buffer.push(heap, legend, glyphs[j]);
+        legend = buffer.push(heap, legend, byte_of(' '));
+        legend = buffer.append(heap, legend, text[ns[j]..ne[j]]);
+        j = j + 1;
+    }
+    out = flush(heap, out, legend);
+    return (0, out);
+}
+
+// The chart as an SVG document: answers (code, document); code 9 when the plot area would be under 20 pixels or a bar under 1 pixel, 7 as above.
+pub fn svg_render[&h, &t, &b, &c, &d, &e, &z](heap: &!h Heap, text: &t [byte], ys: &b [float], n: int, k: int, ns: &d [int], ne: &e [int], cs: &c [int], w: int, hh: int, title: &z [byte], has_title: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 8192);
+    let (top, g) = extent(ys, cs, n, k);
+    let (lo, hi, ok) = axis.fix(0.0, top);
+    if !ok {
+        return (7, out);
+    }
+    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(0.0, top, 6, false);
+    var top0 = 12;
+    if has_title {
+        top0 = 36;
+    }
+    let x0 = 12 + 8 * g;
+    let x1 = w - 16;
+    let y1 = top0;
+    let y2 = hh - 44;
+    if x1 - x0 < 20 || y2 - y1 < 20 {
+        return (9, out);
+    }
+    let x0f = float_of(x0);
+    let y1f = float_of(y1);
+    let pw = float_of(x1 - x0);
+    let sh = float_of(y2 - y1) / float_of(n);
+    let bh = 0.8 * sh / float_of(k);
+    if bh < 1.0 {
+        return (9, out);
+    }
+    out = svg.put(heap, out, "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ");
+    out = svg.numi(heap, out, w);
+    out = svg.put(heap, out, " ");
+    out = svg.numi(heap, out, hh);
+    out = svg.put(heap, out, "\" width=\"");
+    out = svg.numi(heap, out, w);
+    out = svg.put(heap, out, "\" height=\"");
+    out = svg.numi(heap, out, hh);
+    out = svg.put(heap, out, "\" role=\"img\" aria-label=\"");
+    if has_title {
+        out = svg.esc(heap, out, title);
+        out = svg.put(heap, out, ": ");
+    }
+    out = buffer.push_nat(heap, out, k);
+    out = svg.put(heap, out, " series, ");
+    out = buffer.push_nat(heap, out, n);
+    out = svg.put(heap, out, " categories, horizontal bars\">");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\">");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "<path d=\"M ");
+    out = svg.numi(heap, out, x0);
+    out = svg.put(heap, out, " ");
+    out = svg.numi(heap, out, y1);
+    out = svg.put(heap, out, " V ");
+    out = svg.numi(heap, out, y2);
+    out = svg.put(heap, out, " H ");
+    out = svg.numi(heap, out, x1);
+    out = svg.put(heap, out, "\"/>");
+    out = svg.nl(heap, out);
+    var q = xk0;
+    while q <= xk1 {
+        let xx = x0f + (ticks.value(q, xm, xe) - xlo2) / (xhi2 - xlo2) * pw;
+        out = svg.put(heap, out, "<path d=\"M ");
+        out = svg.num(heap, out, xx);
+        out = svg.put(heap, out, " ");
+        out = svg.numi(heap, out, y2);
+        out = svg.put(heap, out, " v4\"/>");
+        out = svg.nl(heap, out);
+        q = q + 1;
+    }
+    out = svg.put(heap, out, "</g>");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "<g font-family=\"sans-serif\" font-size=\"12\" fill=\"currentColor\">");
+    out = svg.nl(heap, out);
+    if has_title {
+        out = svg.put(heap, out, "<text x=\"");
+        out = svg.num(heap, out, float_of(w) / 2.0);
+        out = svg.put(heap, out, "\" y=\"20\" text-anchor=\"middle\" font-size=\"14\">");
+        out = svg.esc(heap, out, title);
+        out = svg.put(heap, out, "</text>");
+        out = svg.nl(heap, out);
+    }
+    var i = 0;
+    while i < n {
+        let la = cs[2 * i];
+        let ln = cut10(cs[2 * i + 1] - la);
+        out = svg.put(heap, out, "<text x=\"");
+        out = svg.numi(heap, out, x0 - 8);
+        out = svg.put(heap, out, "\" y=\"");
+        out = svg.num(heap, out, y1f + (float_of(i) + 0.5) * sh + 4.0);
+        out = svg.put(heap, out, "\" text-anchor=\"end\">");
+        out = svg.esc(heap, out, text[la..la + ln]);
+        out = svg.put(heap, out, "</text>");
+        out = svg.nl(heap, out);
+        i = i + 1;
+    }
+    q = xk0;
+    while q <= xk1 {
+        let xx = x0f + (ticks.value(q, xm, xe) - xlo2) / (xhi2 - xlo2) * pw;
+        out = svg.put(heap, out, "<text x=\"");
+        out = svg.num(heap, out, xx);
+        out = svg.put(heap, out, "\" y=\"");
+        out = svg.numi(heap, out, y2 + 18);
+        out = svg.put(heap, out, "\" text-anchor=\"middle\">");
+        out = ticks.label(heap, out, q, xm, xe);
+        out = svg.put(heap, out, "</text>");
+        out = svg.nl(heap, out);
+        q = q + 1;
+    }
+    var j = 0;
+    while j < k {
+        out = svg.put(heap, out, "<text x=\"");
+        out = svg.numi(heap, out, x0 + 150 * j + 14);
+        out = svg.put(heap, out, "\" y=\"");
+        out = svg.numi(heap, out, hh - 8);
+        out = svg.put(heap, out, "\">");
+        out = svg.esc(heap, out, text[ns[j]..ne[j]]);
+        out = svg.put(heap, out, "</text>");
+        out = svg.nl(heap, out);
+        j = j + 1;
+    }
+    out = svg.put(heap, out, "</g>");
+    out = svg.nl(heap, out);
+    i = 0;
+    while i < n {
+        j = 0;
+        while j < k {
+            out = svg.put(heap, out, "<rect x=\"");
+            out = svg.num(heap, out, x0f);
+            out = svg.put(heap, out, "\" y=\"");
+            out = svg.num(heap, out, y1f + float_of(i) * sh + 0.1 * sh + float_of(j) * bh);
+            out = svg.put(heap, out, "\" width=\"");
+            out = svg.num(heap, out, ys[j * n + i] / xhi2 * pw);
+            out = svg.put(heap, out, "\" height=\"");
+            out = svg.num(heap, out, bh);
+            out = svg.put(heap, out, "\" fill=\"var(--series-");
+            out = buffer.push_nat(heap, out, j + 1);
+            out = svg.put(heap, out, ", #");
+            out = svg.put(heap, out, svg.color(j));
+            out = svg.put(heap, out, ")\"/>");
+            out = svg.nl(heap, out);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    j = 0;
+    while j < k {
+        out = svg.put(heap, out, "<rect x=\"");
+        out = svg.numi(heap, out, x0 + 150 * j);
+        out = svg.put(heap, out, "\" y=\"");
+        out = svg.numi(heap, out, hh - 17);
+        out = svg.put(heap, out, "\" width=\"10\" height=\"10\" fill=\"var(--series-");
+        out = buffer.push_nat(heap, out, j + 1);
+        out = svg.put(heap, out, ", #");
+        out = svg.put(heap, out, svg.color(j));
+        out = svg.put(heap, out, ")\"/>");
+        out = svg.nl(heap, out);
+        j = j + 1;
+    }
+    out = svg.put(heap, out, "</svg>");
+    out = svg.nl(heap, out);
+    return (0, out);
+}

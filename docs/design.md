@@ -511,4 +511,39 @@ The first run killed 35 of 52; the 13 real gaps (a second series; either end of 
 
 **Gallery.** `logby`: two runs on a log axis, from `site/data/converge.csv` (a small hand-written example of two solvers, said so on the page; not a measurement of any solver).
 
-**Still open:** `--by` with groups that have different x values (needs a per-series x in the drawing code), horizontal bars, a staircase ECDF, and the trace of `opt` (section 22) once `opt` prints it.
+**Still open:** `--by` with groups that have different x values (needs a per-series x in the drawing code), a staircase ECDF (horizontal bars: section 35), and the trace of `opt` (section 22) once `opt` prints it.
+
+## 35. Slice 5g: horizontal bars [choice, written with the code; measured in section 36]
+
+    plot --x COL --y COL[,COL..] --with hbars [--term dumb|svg] ...
+
+Section 20 left this out ("horizontal bars"). It is a drawing of its own, not a rotation of the bars: the labels go down the left, where a long name fits, and the values go along the bottom.
+
+**What is taken.** Row r of the table is a category (its label is the cell of `--x`, cut to 10 bytes; section 20's rules for bytes), the series are the `--y` columns (1 to 5), grouped one under the other in each category. Values are **not negative**: a bar starts at 0 and there is no second side, so a value below 0 is `plot.negative-bar` with its line (a negative bar would need a second axis direction, left for when a table asks for it). No intervals, markers, `--diag`, `--logy` or `--xhi`: `plot.usage`. Several kinds of chart do not mix.
+
+**Axis.** From 0 to the greatest value (1 when all are 0), with the ticks of section 10 aimed at 6 intervals; the last tick is the right end.
+
+**`dumb`.** bt = floor(H / (n k)) rows for each bar (`plot.size-invalid` when under 1; H is the room the chart takes, so a table of 3 categories at H = 9 has bars of 3 rows for one series). Row layout: the label right-aligned in a gutter as wide as the longest cut label, on the first row of the category's first bar and blank on the others, then ` |`, then the bar: len = floor(v W / top) glyphs (with 1e-9 of a column of slack, at most W; at least 1 when v > 0), the glyph of series j from `*+xo#`. Then the axis row, `+` and W `-` (the gutter plus 1 spaces before the `+`); the labels of the ticks on a line of their own, each centred on its column, clamped to the area and left out when it would touch the one before (less than one space); then the legend as for the other bars. A title, if given, is centred over the area, as for heat maps.
+
+**`svg`.** The margins of section 13 (left = 12 + 8 g, right 16, top 36 or 12, bottom 44); a row is sh = (y2 - y1) / n high, the group takes 0.8 sh centred and a bar is bh = 0.8 sh / k high (`plot.size-invalid` under 1 pixel, or a plot area under 20). Bar j of category i is `<rect x="x0" y="y1 + i sh + 0.1 sh + j bh" width="v / top * (x1 - x0)" height="bh" fill="var(--series-J, #HEX)"/>`. The labels of the categories are at x0 - 8 (`text-anchor="end"`, y the middle of the row + 4), the ticks of the value axis are marks `M X y2 v4` with the label at y2 + 18; the legend is the squares of section 13 with the name of each series beside it.
+
+**Gate.** `cancho test`: hand-worked charts in both terminals (one series; two series with a title; thick bars; a value that is 0, a tiny one, a large one; all values 0 and a long label; the svg rects and labels by arithmetic), every refusal and the size edges (3 bars in 3 rows pass, in 2 refuse; 60 rows in 140 pixels pass, in 100 refuse); mutants as before.
+
+## 36. Slice 5g, built [measured]
+
+`--with hbars` is built as section 35 says: `lib/plot/hbar.cho` (both terminals), the parsing and the refusal in `chart.cho`, the rule `plot.negative-bar` in `main.cho`. `tests/plot_hbar_test.cho` has 10 `cancho test` cases (85 + 21 + 15 + 12 + 10 in the five files).
+
+**Measured by hand.** Every expected text was worked out from the rule before it was written, and where a guessed text failed, the real output was checked against the rule and the test was corrected, not the program: the ticks of 0 to 10 over 20 columns are at 0, 4, 8, 12, 16 and 19 (the last label clamped), a label that would touch the one before is left out (`0.0  0.6` for 0 to 1 over 10 columns), and 0.29 of 1 over 100 columns is 29 columns (0.29 * 100 is 28.999999999999996 in a double; the slack of 1e-9 of a column gives 29).
+
+**Mutants.** 47 single-line mutants of `hbar.cho` and of the new lines of `chart.cho`: 41 killed, 6 survive, all equivalent:
+
+- `ys[i] > top` to `>=`: assigns the same value.
+- `len0 > w` to `len0 > w - 1` (the cap sets `w`): a bar cannot be longer than the axis, so the cap is defensive; and `col > w - 1` to `col > w` and `start < 0` to `start < 1` for the same reason (the clamp after it gives the same column).
+- `len0 < 1` to `len0 < 2` (the body sets 1): the same value for len0 = 1, and 0 is below both.
+- the `len(xhi) > 0` term of the usage check: `--xhi` is already refused for every kind but histograms and heatmaps, earlier in the same function.
+
+The first run killed 33 of 47; the gaps (the maximum over the later series, a label of exactly 11 bytes, the slack, the four edges of the size rules, the legend position, a range the ticks cannot stand for) each have a test now.
+
+**Not measured:** bars on a table with hundreds of categories in `dumb` (the rows needed are n k, each a line; the limit is the size rule above), and negative bars (refused, section 35).
+
+**Gallery.** `hbars` and `hbarstext` draw `site/data/importance.csv` (the permutation importance of the first chart, as horizontal bars).
