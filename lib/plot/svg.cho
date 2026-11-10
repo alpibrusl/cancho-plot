@@ -10,7 +10,7 @@ import std.fmt;
 // The SVG terminal (docs/design.md section 13): the points of a table in, a standalone SVG document out. One element a line; every number written with two decimals; no clock, no id, no random.
 
 // `x` with 2 decimals, correctly rounded from the double, trailing zeros and a bare point dropped, appended to `b` (every coordinate is at least 12, so there is no `-0`)
-fn num[&h](heap: &!h Heap, b: buffer.Buffer, x: float) -> [heap] buffer.Buffer {
+pub fn num[&h](heap: &!h Heap, b: buffer.Buffer, x: float) -> [heap] buffer.Buffer {
     var out = b;
     region a {
         let sc = alloc_slice[a](400, byte_of(0));
@@ -29,12 +29,12 @@ fn num[&h](heap: &!h Heap, b: buffer.Buffer, x: float) -> [heap] buffer.Buffer {
     return out;
 }
 
-fn numi[&h](heap: &!h Heap, b: buffer.Buffer, v: int) -> [heap] buffer.Buffer {
+pub fn numi[&h](heap: &!h Heap, b: buffer.Buffer, v: int) -> [heap] buffer.Buffer {
     return num(heap, b, float_of(v));
 }
 
 // `text` with & < > " escaped
-fn esc[&h, &t](heap: &!h Heap, b: buffer.Buffer, text: &t [byte]) -> [heap] buffer.Buffer {
+pub fn esc[&h, &t](heap: &!h Heap, b: buffer.Buffer, text: &t [byte]) -> [heap] buffer.Buffer {
     var out = b;
     var i = 0;
     while i < len(text) {
@@ -71,11 +71,11 @@ fn color(j: int) -> [] &static [byte] {
     return "cf222e";
 }
 
-fn put[&h](heap: &!h Heap, b: buffer.Buffer, s: &static [byte]) -> [heap] buffer.Buffer {
+pub fn put[&h](heap: &!h Heap, b: buffer.Buffer, s: &static [byte]) -> [heap] buffer.Buffer {
     return buffer.append(heap, b, s);
 }
 
-fn nl[&h](heap: &!h Heap, b: buffer.Buffer) -> [heap] buffer.Buffer {
+pub fn nl[&h](heap: &!h Heap, b: buffer.Buffer) -> [heap] buffer.Buffer {
     return buffer.push(heap, b, byte_of(10));
 }
 

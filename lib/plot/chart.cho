@@ -5,6 +5,7 @@ module plot.chart;
 import plot.axis;
 import plot.csv;
 import plot.dumb;
+import plot.heat;
 import plot.num;
 import plot.svg;
 import std.buffer;
@@ -12,6 +13,21 @@ import std.buffer;
 // A table in memory in, a chart out (docs/design.md sections 11 and 13). The codes `draw` answers with: 0 done; 1 a double quote; 2 a cell that is not a number; 3 a line with the wrong number of cells;
 // 4 no rows; 5 a column that is not there; 6 more than 5,000 rows; 7 a range the ticks cannot stand for; 8 more than 5 series; 9 a plot area under 20 (svg); 10 a control byte in the title or a name.
 // The caller maps them to rule tags.
+
+// do the two spans of the text read the same
+fn same_span[&t](text: &t [byte], a: int, b: int, c: int, d: int) -> [] bool {
+    if b - a != d - c {
+        return false;
+    }
+    var i = 0;
+    while i < b - a {
+        if text[a + i] != text[c + i] {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
 
 // does the text hold a byte below 0x20 or the byte 0x7f
 fn has_control[&t](text: &t [byte]) -> [] bool {
@@ -88,7 +104,11 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
     if ac[4] == 2 && (len(xhi) == 0 || ke > 0 || ac[7] == 1) {
         return (11, 0, none);
     }
-    if ac[4] != 2 && len(xhi) > 0 {
+    // a heatmap (section 29) takes one column for its rows, the value column in `xhi`, and no intervals or categories
+    if ac[4] == 4 && (ycount != 1 || len(xhi) == 0 || ke > 0 || ac[7] == 1) {
+        return (11, 0, none);
+    }
+    if ac[4] != 2 && ac[4] != 4 && len(xhi) > 0 {
         return (11, 0, none);
     }
     // a box plot (section 27) takes five columns, in the order lower, q1, median, q3, upper, and no intervals or categories (--ylo and --yhi count as intervals: kh is ke when they are given)
@@ -106,7 +126,7 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
         let ec = alloc_slice[r](5, 0);
         let eh = alloc_slice[r](5, 0);
         var hcol = 0 - 1;
-        if ac[4] == 2 {
+        if ac[4] == 2 || ac[4] == 4 {
             hcol = csv.column(text, 0, hend, xhi);
             if hcol < 0 {
                 code = 5;
@@ -188,11 +208,11 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
             let ncols = csv.cells(text, 0, hend);
             let xsb = box_slice(heap, n, 0.0);
             var extra = 0;
-            if ac[4] == 2 {
+            if ac[4] == 2 || ac[4] == 4 {
                 extra = 1;
             }
             let ysb = box_slice(heap, n * (ycount + 2 * ke + extra), 0.0);
-            let clb = box_slice(heap, 2 * n, 0);
+            let clb = box_slice(heap, 6 * n, 0);
             borrow mut xsb as &!xw in {
                 borrow mut ysb as &!yw in {
                     borrow mut clb as &!cw in {
@@ -208,7 +228,7 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                 line = row + 2;
                             } else {
                                 let (a, b) = csv.cell(text, at, end, xcol);
-                                if ac[4] == 1 || ac[4] == 3 || ac[7] == 1 {
+                                if ac[4] == 1 || ac[4] == 3 || ac[4] == 4 || ac[7] == 1 {
                                     // a category: its label is the cell, its place the row (section 20)
                                     xs[row] = float_of(row);
                                     cl[2 * row] = a;
@@ -225,21 +245,33 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                         xs[row] = v;
                                     }
                                 }
-                                if ac[4] == 2 && code == 0 {
-                                    // the upper edge of the bin, after the columns of the series and of the errors
+                                if (ac[4] == 2 || ac[4] == 4) && code == 0 {
+                                    // the upper edge, or the value of a cell of the bin, after the columns of the series and of the errors
                                     let (c3, d3) = csv.cell(text, at, end, hcol);
                                     let (ok5, v5) = num.number(text[c3..d3]);
                                     if !ok5 {
                                         code = 2;
                                         line = row + 2;
-                                    } else if v5 <= xs[row] {
+                                    } else if ac[4] == 2 && v5 <= xs[row] {
                                         code = 7;
                                         line = row + 2;
                                     } else {
                                         ys[(ycount + 2 * ke) * n + row] = v5;
+                                        cl[4 * n + 2 * row] = c3;
+                                        cl[4 * n + 2 * row + 1] = d3;
                                     }
                                 }
                                 var q = 0;
+                                if ac[4] == 4 {
+                                    // the row of a heatmap cell is a label too
+                                    let (c, d) = csv.cell(text, at, end, yc[0]);
+                                    cl[2 * n + 2 * row] = c;
+                                    cl[2 * n + 2 * row + 1] = d;
+                                    if has_control(text[c..d]) {
+                                        code = 10;
+                                    }
+                                    q = ycount;
+                                }
                                 while q < ycount && code == 0 {
                                     let (c, d) = csv.cell(text, at, end, yc[q]);
                                     let (ok2, v2) = num.number(text[c..d]);
@@ -292,7 +324,64 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                             at = csv.next_line(text, end);
                             row = row + 1;
                         }
-                        if code == 0 {
+                        if code == 0 && ac[4] == 4 {
+                            // the categories of a heatmap, numbered by first appearance, and the cells given twice (section 29)
+                            var cx = 0;
+                            var cy = 0;
+                            var r1 = 0;
+                            while r1 < n {
+                                var fx = 0 - 1;
+                                var fy = 0 - 1;
+                                var r2 = 0;
+                                while r2 < r1 {
+                                    if fx < 0 && same_span(text, cl[2 * r1], cl[2 * r1 + 1], cl[2 * r2], cl[2 * r2 + 1]) {
+                                        fx = truncate(xs[r2]);
+                                    }
+                                    if fy < 0 && same_span(text, cl[2 * n + 2 * r1], cl[2 * n + 2 * r1 + 1], cl[2 * n + 2 * r2], cl[2 * n + 2 * r2 + 1]) {
+                                        fy = truncate(ys[r2]);
+                                    }
+                                    r2 = r2 + 1;
+                                }
+                                if fx < 0 {
+                                    fx = cx;
+                                    cx = cx + 1;
+                                }
+                                if fy < 0 {
+                                    fy = cy;
+                                    cy = cy + 1;
+                                }
+                                xs[r1] = float_of(fx);
+                                ys[r1] = float_of(fy);
+                                r1 = r1 + 1;
+                            }
+                            if cx > 50 || cy > 50 {
+                                code = 6;
+                            }
+                            r1 = 1;
+                            while r1 < n && code == 0 {
+                                var r2 = 0;
+                                while r2 < r1 && code == 0 {
+                                    if xs[r1] == xs[r2] && ys[r1] == ys[r2] {
+                                        code = 16;
+                                        line = r1 + 2;
+                                    }
+                                    r2 = r2 + 1;
+                                }
+                                r1 = r1 + 1;
+                            }
+                            if code == 0 {
+                                buffer.drop(heap, out);
+                                if svg_term {
+                                    let (rc, chart) = heat.svg_render(heap, text, xs, ys, n, cl, w, hh, title, has_title);
+                                    code = rc;
+                                    out = chart;
+                                } else {
+                                    let (rc, chart) = heat.dumb_render(heap, text, xs, ys, n, cl, w, hh, title, has_title);
+                                    code = rc;
+                                    out = chart;
+                                }
+                            }
+                        } else if code == 0 {
                             let (xlo, xhi, ylo, yhi) = axis.extent(xs, ys, n, ycount, ann, ac);
                             let (a, b, xok) = axis.fix(xlo, xhi);
                             let (c, d, yok) = axis.fix(ylo, yhi);

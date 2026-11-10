@@ -683,6 +683,48 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 </pre>
 <p class="cmd"><code>plot --json data.columns --x name --y min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max --with box --term dumb --size 40x12 &lt; stats-describe.json</code> <a href="data/stats-describe.json">the table</a> <a href="gallery/boxtext.txt">the text</a></p>
 </figure>
+<figure id="jsonheat">
+<h3>A heatmap from stats corr</h3>
+<p>The long form <code>stats corr</code> prints (<code>data.pairs</code>: <code>x</code>, <code>y</code>, <code>r</code>): one cell for each pair, the value as a shade and written in the cell, the cells that are not given blank.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 260" width="420" height="260" role="img" aria-label="stats corr: Pearson r: 2 by 2 heatmap">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 28 36 V 216 H 404"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="210" y="20" text-anchor="middle" font-size="14">stats corr: Pearson r</text>
+<text x="20" y="85" text-anchor="end">x2</text>
+<text x="20" y="175" text-anchor="end">y</text>
+<text x="122" y="234" text-anchor="middle">x1</text>
+<text x="310" y="234" text-anchor="middle">x2</text>
+<text x="28" y="252">min 0.05847881882164951  max 0.7274500944994768</text>
+</g>
+<rect x="28" y="36" width="188" height="90" fill="var(--series-1, #0550ae)" fill-opacity="0.05"/>
+<rect x="28" y="126" width="188" height="90" fill="var(--series-1, #0550ae)" fill-opacity="0.95"/>
+<rect x="216" y="126" width="188" height="90" fill="var(--series-1, #0550ae)" fill-opacity="0.27"/>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="122" y="85" text-anchor="middle">0.0584</text>
+<text x="122" y="175" text-anchor="middle">0.7274</text>
+<text x="310" y="175" text-anchor="middle">0.2231</text>
+</g>
+</svg>
+</div>
+<p class="cmd"><code>plot --json data.pairs --x x --y y --z r --with heat --term svg --size 420x260 --title 'stats corr: Pearson r' &lt; stats-corr.json</code> <a href="data/stats-corr.json">the table</a> <a href="gallery/jsonheat.svg">the svg</a></p>
+</figure>
+<figure id="heattext">
+<h3>The same heatmap as text</h3>
+<p>Each cell is a block of one glyph from <code>.,:-=+*#%@</code>, the lowest to the highest value; the line under it says what the two ends are.</p>
+<pre>x2 |...............
+   |...............
+   |...............
+ y |@@@@@@@@@@@@@@@:::::::::::::::
+   |@@@@@@@@@@@@@@@:::::::::::::::
+   |@@@@@@@@@@@@@@@:::::::::::::::
+   +------------------------------
+          x1             x2
+min 0.05847881882164951  max 0.7274500944994768
+</pre>
+<p class="cmd"><code>plot --json data.pairs --x x --y y --z r --with heat --term dumb --size 30x6 &lt; stats-corr.json</code> <a href="data/stats-corr.json">the table</a> <a href="gallery/heattext.txt">the text</a></p>
+</figure>
 <figure id="barstext">
 <h3>Bars as text</h3>
 <p>The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.</p>
@@ -767,7 +809,7 @@ $ plot ticks 0 1000000
 </code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Box plots (<code>--with box</code>). Not built yet: heatmaps, ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Box plots (<code>--with box</code>). Heatmaps (<code>--with heat --z</code>). Not built yet: ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

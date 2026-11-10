@@ -1,0 +1,403 @@
+edition 9;
+
+module plot.heat;
+
+import plot.axis;
+import plot.svg;
+import std.buffer;
+
+// Heatmaps (docs/design.md section 29): the cells of a table as a matrix, a colour (a glyph in text) for each value. The rows of the table are `n` cells: xs[r] is the number of the column of cell r, ys[r] the number of its row and ys[n + r] its value; cs holds the
+// spans in `text` of the label of its column (cs[2r], cs[2r + 1]), of its row (cs[2n + 2r], ..) and of its value (cs[4n + 2r], ..).
+
+// the number of categories: the highest number plus one
+fn count_of[&a](nums: &a [float], n: int, from: int) -> [] int {
+    var top = 0;
+    var r = 0;
+    while r < n {
+        let v = truncate(nums[from + r]);
+        if v + 1 > top {
+            top = v + 1;
+        }
+        r = r + 1;
+    }
+    return top;
+}
+
+// the first row whose number is c
+fn first_row[&a](nums: &a [float], n: int, from: int, c: int) -> [] int {
+    var r = 0;
+    while r < n {
+        if truncate(nums[from + r]) == c {
+            return r;
+        }
+        r = r + 1;
+    }
+    return 0;
+}
+
+// t of a value: 0.5 when the scale has no width
+fn level_t(v: float, vmin: float, vmax: float) -> [] float {
+    if vmax == vmin {
+        return 0.5;
+    }
+    return (v - vmin) / (vmax - vmin);
+}
+
+fn cut10(len0: int) -> [] int {
+    if len0 > 10 {
+        return 10;
+    }
+    return len0;
+}
+
+fn spaces[&h](heap: &!h Heap, b: buffer.Buffer, n: int) -> [heap] buffer.Buffer {
+    var out = b;
+    var i = 0;
+    while i < n {
+        out = buffer.push(heap, out, byte_of(' '));
+        i = i + 1;
+    }
+    return out;
+}
+
+fn flush[&h](heap: &!h Heap, out: buffer.Buffer, line: buffer.Buffer) -> [heap] buffer.Buffer {
+    var o = out;
+    borrow line as &lb in {
+        let bs = buffer.bytes(lb);
+        var n = len(bs);
+        while n > 0 && int_of(bs[n - 1]) == ' ' {
+            n = n - 1;
+        }
+        o = buffer.append(heap, o, bs[0..n]);
+    }
+    buffer.drop(heap, line);
+    return buffer.push(heap, o, byte_of(10));
+}
+
+// The heatmap as text: answers (code, chart); code 9 when a cell would be under a column or a row.
+pub fn dumb_render[&h, &t, &a, &b, &c, &z](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, cs: &c [int], w: int, hh: int, title: &z [byte], has_title: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 2048);
+    let nx = count_of(xs, n, 0);
+    let ny = count_of(ys, n, 0);
+    let cw = w / nx;
+    let ch = hh / ny;
+    if cw < 1 || ch < 1 {
+        return (9, out);
+    }
+    var vmin = ys[n];
+    var vmax = ys[n];
+    var rmin = 0;
+    var rmax = 0;
+    var r = 0;
+    while r < n {
+        if ys[n + r] < vmin {
+            vmin = ys[n + r];
+            rmin = r;
+        }
+        if ys[n + r] > vmax {
+            vmax = ys[n + r];
+            rmax = r;
+        }
+        r = r + 1;
+    }
+    let total = nx * cw;
+    // the row labels decide the gutter
+    var g = 0;
+    var j = 0;
+    while j < ny {
+        let fr = first_row(ys, n, 0, j);
+        let ln = cut10(cs[2 * n + 2 * fr + 1] - cs[2 * n + 2 * fr]);
+        if ln > g {
+            g = ln;
+        }
+        j = j + 1;
+    }
+    region reg {
+        let levels = alloc_slice[reg](nx * ny, 0 - 1);
+        r = 0;
+        while r < n {
+            var lv = truncate(level_t(ys[n + r], vmin, vmax) * 10.0);
+            if lv > 9 {
+                lv = 9;
+            }
+            levels[truncate(ys[r]) * nx + truncate(xs[r])] = lv;
+            r = r + 1;
+        }
+        let ramp = ".,:-=+*#%@";
+        if has_title {
+            var tl = spaces(heap, buffer.empty(heap, 64), g + 2);
+            var pad = (total - len(title)) / 2;
+            if pad < 0 {
+                pad = 0;
+            }
+            tl = spaces(heap, tl, pad);
+            tl = buffer.append(heap, tl, title);
+            out = flush(heap, out, tl);
+        }
+        j = 0;
+        while j < ny {
+            let fr = first_row(ys, n, 0, j);
+            let la = cs[2 * n + 2 * fr];
+            let ln = cut10(cs[2 * n + 2 * fr + 1] - la);
+            var sub = 0;
+            while sub < ch {
+                var line = buffer.empty(heap, 64);
+                if sub == 0 {
+                    line = spaces(heap, line, g - ln);
+                    line = buffer.append(heap, line, text[la..la + ln]);
+                } else {
+                    line = spaces(heap, line, g);
+                }
+                line = buffer.push(heap, line, byte_of(' '));
+                line = buffer.push(heap, line, byte_of('|'));
+                var i = 0;
+                while i < nx {
+                    var k = 0;
+                    while k < cw {
+                        let lv = levels[j * nx + i];
+                        if lv < 0 {
+                            line = buffer.push(heap, line, byte_of(' '));
+                        } else {
+                            line = buffer.push(heap, line, ramp[lv]);
+                        }
+                        k = k + 1;
+                    }
+                    i = i + 1;
+                }
+                out = flush(heap, out, line);
+                sub = sub + 1;
+            }
+            j = j + 1;
+        }
+        var ax = spaces(heap, buffer.empty(heap, 64), g);
+        ax = buffer.push(heap, ax, byte_of(' '));
+        ax = buffer.push(heap, ax, byte_of('+'));
+        var d = 0;
+        while d < total {
+            ax = buffer.push(heap, ax, byte_of('-'));
+            d = d + 1;
+        }
+        out = flush(heap, out, ax);
+        // the labels of the columns, centred on their blocks, left out when they would touch
+        let xl = alloc_slice[reg](total, byte_of(' '));
+        var prev_end = 0 - 2;
+        var i = 0;
+        while i < nx {
+            let fr = first_row(xs, n, 0, i);
+            let la = cs[2 * fr];
+            let ln = cut10(cs[2 * fr + 1] - la);
+            let col = i * cw + cw / 2;
+            var start = col - ln / 2;
+            if start > total - ln {
+                start = total - ln;
+            }
+            if start < 0 {
+                start = 0;
+            }
+            if ln <= total && start >= prev_end + 1 {
+                var u = 0;
+                while u < ln {
+                    xl[start + u] = text[la + u];
+                    u = u + 1;
+                }
+                prev_end = start + ln;
+            }
+            i = i + 1;
+        }
+        var xline = spaces(heap, buffer.empty(heap, 64), g + 2);
+        xline = buffer.append(heap, xline, xl[0..total]);
+        out = flush(heap, out, xline);
+        var sc = buffer.append(heap, buffer.empty(heap, 64), "min ");
+        sc = buffer.append(heap, sc, text[cs[4 * n + 2 * rmin]..cs[4 * n + 2 * rmin + 1]]);
+        sc = buffer.append(heap, sc, "  max ");
+        sc = buffer.append(heap, sc, text[cs[4 * n + 2 * rmax]..cs[4 * n + 2 * rmax + 1]]);
+        out = flush(heap, out, sc);
+    }
+    return (0, out);
+}
+
+// The heatmap as an SVG document: answers (code, document); code 9 when the plot area would be under 20 wide or high.
+pub fn svg_render[&h, &t, &a, &b, &c, &z](heap: &!h Heap, text: &t [byte], xs: &a [float], ys: &b [float], n: int, cs: &c [int], w: int, hh: int, title: &z [byte], has_title: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 8192);
+    let nx = count_of(xs, n, 0);
+    let ny = count_of(ys, n, 0);
+    var vmin = ys[n];
+    var vmax = ys[n];
+    var rmin = 0;
+    var rmax = 0;
+    var r = 0;
+    while r < n {
+        if ys[n + r] < vmin {
+            vmin = ys[n + r];
+            rmin = r;
+        }
+        if ys[n + r] > vmax {
+            vmax = ys[n + r];
+            rmax = r;
+        }
+        r = r + 1;
+    }
+    var g = 0;
+    var j = 0;
+    while j < ny {
+        let fr = first_row(ys, n, 0, j);
+        let ln = cut10(cs[2 * n + 2 * fr + 1] - cs[2 * n + 2 * fr]);
+        if ln > g {
+            g = ln;
+        }
+        j = j + 1;
+    }
+    var top = 12;
+    if has_title {
+        top = 36;
+    }
+    let x0 = 12 + 8 * g;
+    let x1 = w - 16;
+    let y1 = top;
+    let y2 = hh - 44;
+    if x1 - x0 < 20 || y2 - y1 < 20 {
+        return (9, out);
+    }
+    let x0f = float_of(x0);
+    let y1f = float_of(y1);
+    let sw = float_of(x1 - x0) / float_of(nx);
+    let sh = float_of(y2 - y1) / float_of(ny);
+    out = svg.put(heap, out, "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ");
+    out = svg.numi(heap, out, w);
+    out = svg.put(heap, out, " ");
+    out = svg.numi(heap, out, hh);
+    out = svg.put(heap, out, "\" width=\"");
+    out = svg.numi(heap, out, w);
+    out = svg.put(heap, out, "\" height=\"");
+    out = svg.numi(heap, out, hh);
+    out = svg.put(heap, out, "\" role=\"img\" aria-label=\"");
+    if has_title {
+        out = svg.esc(heap, out, title);
+        out = svg.put(heap, out, ": ");
+    }
+    out = buffer.push_nat(heap, out, nx);
+    out = svg.put(heap, out, " by ");
+    out = buffer.push_nat(heap, out, ny);
+    out = svg.put(heap, out, " heatmap\">");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\">");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "<path d=\"M ");
+    out = svg.numi(heap, out, x0);
+    out = svg.put(heap, out, " ");
+    out = svg.numi(heap, out, y1);
+    out = svg.put(heap, out, " V ");
+    out = svg.numi(heap, out, y2);
+    out = svg.put(heap, out, " H ");
+    out = svg.numi(heap, out, x1);
+    out = svg.put(heap, out, "\"/>");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "</g>");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "<g font-family=\"sans-serif\" font-size=\"12\" fill=\"currentColor\">");
+    out = svg.nl(heap, out);
+    if has_title {
+        out = svg.put(heap, out, "<text x=\"");
+        out = svg.num(heap, out, float_of(w) / 2.0);
+        out = svg.put(heap, out, "\" y=\"20\" text-anchor=\"middle\" font-size=\"14\">");
+        out = svg.esc(heap, out, title);
+        out = svg.put(heap, out, "</text>");
+        out = svg.nl(heap, out);
+    }
+    j = 0;
+    while j < ny {
+        let fr = first_row(ys, n, 0, j);
+        let la = cs[2 * n + 2 * fr];
+        let ln = cut10(cs[2 * n + 2 * fr + 1] - la);
+        out = svg.put(heap, out, "<text x=\"");
+        out = svg.numi(heap, out, x0 - 8);
+        out = svg.put(heap, out, "\" y=\"");
+        out = svg.num(heap, out, y1f + (float_of(j) + 0.5) * sh + 4.0);
+        out = svg.put(heap, out, "\" text-anchor=\"end\">");
+        out = svg.esc(heap, out, text[la..la + ln]);
+        out = svg.put(heap, out, "</text>");
+        out = svg.nl(heap, out);
+        j = j + 1;
+    }
+    var prev = 0.0;
+    var have_prev = false;
+    var i = 0;
+    while i < nx {
+        let fr = first_row(xs, n, 0, i);
+        let la = cs[2 * fr];
+        let ln = cut10(cs[2 * fr + 1] - la);
+        let xx = x0f + (float_of(i) + 0.5) * sw;
+        if !have_prev || xx - prev >= 8.0 * float_of(ln + 1) {
+            out = svg.put(heap, out, "<text x=\"");
+            out = svg.num(heap, out, xx);
+            out = svg.put(heap, out, "\" y=\"");
+            out = svg.numi(heap, out, y2 + 18);
+            out = svg.put(heap, out, "\" text-anchor=\"middle\">");
+            out = svg.esc(heap, out, text[la..la + ln]);
+            out = svg.put(heap, out, "</text>");
+            out = svg.nl(heap, out);
+            prev = xx;
+            have_prev = true;
+        }
+        i = i + 1;
+    }
+    out = svg.put(heap, out, "<text x=\"");
+    out = svg.numi(heap, out, x0);
+    out = svg.put(heap, out, "\" y=\"");
+    out = svg.numi(heap, out, hh - 8);
+    out = svg.put(heap, out, "\">min ");
+    out = svg.esc(heap, out, text[cs[4 * n + 2 * rmin]..cs[4 * n + 2 * rmin + 1]]);
+    out = svg.put(heap, out, "  max ");
+    out = svg.esc(heap, out, text[cs[4 * n + 2 * rmax]..cs[4 * n + 2 * rmax + 1]]);
+    out = svg.put(heap, out, "</text>");
+    out = svg.nl(heap, out);
+    out = svg.put(heap, out, "</g>");
+    out = svg.nl(heap, out);
+    r = 0;
+    while r < n {
+        let ci = float_of(truncate(xs[r]));
+        let cj = float_of(truncate(ys[r]));
+        let t = level_t(ys[n + r], vmin, vmax);
+        out = svg.put(heap, out, "<rect x=\"");
+        out = svg.num(heap, out, x0f + ci * sw);
+        out = svg.put(heap, out, "\" y=\"");
+        out = svg.num(heap, out, y1f + cj * sh);
+        out = svg.put(heap, out, "\" width=\"");
+        out = svg.num(heap, out, sw);
+        out = svg.put(heap, out, "\" height=\"");
+        out = svg.num(heap, out, sh);
+        out = svg.put(heap, out, "\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"");
+        out = svg.num(heap, out, 0.05 + 0.9 * t);
+        out = svg.put(heap, out, "\"/>");
+        out = svg.nl(heap, out);
+        r = r + 1;
+    }
+    if sw >= 30.0 && sh >= 14.0 {
+        out = svg.put(heap, out, "<g font-family=\"sans-serif\" font-size=\"12\" fill=\"currentColor\">");
+        out = svg.nl(heap, out);
+        r = 0;
+        while r < n {
+            let ci = float_of(truncate(xs[r]));
+            let cj = float_of(truncate(ys[r]));
+            let za = cs[4 * n + 2 * r];
+            var zl = cs[4 * n + 2 * r + 1] - za;
+            if zl > 6 {
+                zl = 6;
+            }
+            out = svg.put(heap, out, "<text x=\"");
+            out = svg.num(heap, out, x0f + (ci + 0.5) * sw);
+            out = svg.put(heap, out, "\" y=\"");
+            out = svg.num(heap, out, y1f + (cj + 0.5) * sh + 4.0);
+            out = svg.put(heap, out, "\" text-anchor=\"middle\">");
+            out = svg.esc(heap, out, text[za..za + zl]);
+            out = svg.put(heap, out, "</text>");
+            out = svg.nl(heap, out);
+            r = r + 1;
+        }
+        out = svg.put(heap, out, "</g>");
+        out = svg.nl(heap, out);
+    }
+    out = svg.put(heap, out, "</svg>");
+    out = svg.nl(heap, out);
+    return (0, out);
+}

@@ -426,7 +426,7 @@ This is the long form `stats corr` prints (`pairs` of `x`, `y`, `r`) and the one
 
 **Scale.** vmin and vmax are the least and greatest value; t = (v - vmin) / (vmax - vmin), and 0.5 for all cells when vmax = vmin. The two numbers are written under the chart as the cells' own text (the text of the first cell that holds each).
 
-**`dumb`.** With nx columns of cells and ny rows, a cell is cw = floor(W / nx) columns by ch = floor(H / ny) rows, at least 1 each (`plot.size-invalid` otherwise); the chart is nx cw by ny ch. A cell holds the glyph of level min(9, floor(10 t)) in the ramp ` .:-=+*#%@` (t = 0.5 is level 5, `+`... counted from 0: ` `, `.`, `:`, `-`, `=`, `+`). A row is
+**`dumb`.** With nx columns of cells and ny rows, a cell is cw = floor(W / nx) columns by ch = floor(H / ny) rows, at least 1 each (`plot.size-invalid` otherwise); the chart is nx cw by ny ch. A cell holds the glyph of level min(9, floor(10 t)) in the ramp `.,:-=+*#%@` (counted from 0: t = 0.5 is level 5, `+`; the lowest level is a visible glyph, so a cell that is not given, a space, can be told from a low one: the first draft had a space for level 0 and a real corr matrix showed a minimum as a hole). A row is
 its label (the first 10 bytes, right-aligned in a gutter as wide as the longest label, on the first line of its block, blank on the others), a space, `|`, the cells. Then the axis row, `+` and nx cw `-`, in the gutter's width of spaces plus a space; the labels of the columns on one line, each cut to 10 bytes and centred
 on the middle of its block, left out when it would touch the one before (section 11's rule); then the line `min V  max V`. The title is as before.
 
@@ -434,3 +434,16 @@ on the middle of its block, left out when it would touch the one before (section
 sw is at least 30 and sh at least 14, the value is written in the cell, `<text x="centre" y="centre + 4" text-anchor="middle">`, as the cell's own text cut to 6 bytes. The row labels are at x0 - 8 (`text-anchor="end"`, y the centre + 4), the column labels at y2 + 18 (the rule of bars), and the line `min V  max V` at x0, y = H - 8.
 
 **Gate.** `cancho test`: hand-worked charts in both terminals (three by three with a blank cell, a constant matrix, one cell), every refusal, the JSON path on a real `stats corr` document; the mutant measurement as before.
+
+## 30. Slice 5d-2, built [measured]
+
+Heatmaps are built as section 29 says, in `lib/plot/heat.cho`, with the parsing in `chart.cho` and the flag `--with heat --z COL`. 85 `cancho test` cases pass in all (`tests/plot_test.cho` and `tests/plot_cases_test.cho`, run one file at a time).
+
+**Mutants.** 41 single-line mutants of `heat.cho` and of the heat paths of `chart.cho`: 39 killed, 2 survive, and both are equivalent:
+
+- `if lv > 9 { lv = 9; }` to `lv >= 9`: the body then assigns 9 to 9.
+- `if start > total - ln { start = total - ln; }` to `>=`: the body then assigns `total - ln` to itself.
+
+A first run killed 34 of 41; the seven that lived were real gaps, and tests were added for them.
+
+**Gallery.** `jsonheat` (svg) and `heattext` (dumb) draw the real `stats corr` document in `site/data/stats-corr.json`.

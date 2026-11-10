@@ -1433,3 +1433,352 @@ fn test_dumb_box_far_from_zero[&h](heap: &!h Heap) -> [heap] int {
     same(heap, doc, "6 |  |\n5 |#####\n4 |=====\n3 |#####\n2 |  |\n  +------\n      A\n");
     return 0;
 }
+
+// ---- heatmaps (section 29): worked out by hand ---------------------------------------------------------------------------------------------------------------
+
+// the heatmap of a table whose x and `ycol` are labels and whose `z` is the value
+fn drawn_heat[&h, &t](heap: &!h Heap, table: &t [byte], ycol: &static [byte], z: &static [byte], w: int, hh: int, svg_term: bool, cat: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 1);
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        ac[4] = 4;
+        if cat {
+            ac[7] = 1;
+        }
+        let (c, l, chart) = chart.draw(heap, table, "a", ycol, "", "", z, w, hh, "", false, false, svg_term, ann, ac);
+        code = c;
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return (code, out);
+}
+
+// two by two cells of 10 columns by 3 rows; the values 1, 3, 2, 9: levels 0 2 1 9, the glyphs . : , @
+fn test_dumb_heatmap[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_heat(heap, "a,b,v\nx,p,1\ny,p,3\nx,q,2\ny,q,9\n", "b", "v", 20, 6, false, false);
+    test.assert(code == 0);
+    same(heap, doc, "p |..........::::::::::\n  |..........::::::::::\n  |..........::::::::::\nq |,,,,,,,,,,@@@@@@@@@@\n  |,,,,,,,,,,@@@@@@@@@@\n  |,,,,,,,,,,@@@@@@@@@@\n  +--------------------\n        x         y\nmin 1  max 9\n");
+    return 0;
+}
+
+// a constant matrix is level 5 (+), and a cell that is not given is blank
+fn test_dumb_heatmap_blank_and_constant[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_heat(heap, "a,b,v\nx,p,5\ny,q,5\n", "b", "v", 4, 2, false, false);
+    test.assert(code == 0);
+    same(heap, doc, "p |++\nq |  ++\n  +----\n    x y\nmin 5  max 5\n");
+    return 0;
+}
+
+// the same in svg: cells of 302 by 172, opacity 0.05 + 0.9 t for the values 0, 2, 5, 10
+fn test_svg_heatmap[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_heat(heap, "a,b,v\nx,p,0\ny,p,2\nx,q,5\ny,q,10\n", "b", "v", 640, 400, true, false);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "aria-label=\"2 by 2 heatmap\""));
+        test.assert(has(t, "<path d=\"M 20 12 V 356 H 624\"/>\n"));
+        test.assert(has(t, "<text x=\"12\" y=\"102\" text-anchor=\"end\">p</text>\n<text x=\"12\" y=\"274\" text-anchor=\"end\">q</text>\n"));
+        test.assert(has(t, "<text x=\"171\" y=\"374\" text-anchor=\"middle\">x</text>\n<text x=\"473\" y=\"374\" text-anchor=\"middle\">y</text>\n"));
+        test.assert(has(t, "<text x=\"20\" y=\"392\">min 0  max 10</text>\n"));
+        test.assert(has(t, "<rect x=\"20\" y=\"12\" width=\"302\" height=\"172\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.05\"/>\n<rect x=\"322\" y=\"12\" width=\"302\" height=\"172\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.23\"/>\n<rect x=\"20\" y=\"184\" width=\"302\" height=\"172\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.5\"/>\n<rect x=\"322\" y=\"184\" width=\"302\" height=\"172\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.95\"/>\n"));
+        test.assert(has(t, "<text x=\"171\" y=\"102\" text-anchor=\"middle\">0</text>\n<text x=\"473\" y=\"102\" text-anchor=\"middle\">2</text>\n<text x=\"171\" y=\"274\" text-anchor=\"middle\">5</text>\n<text x=\"473\" y=\"274\" text-anchor=\"middle\">10</text>\n"));
+    }
+    buffer.drop(heap, doc);
+    // cells under 30 pixels wide have no value in them
+    let (c2, d2) = drawn_heat(heap, "a,b,v\nx,p,0\ny,p,2\nx,q,5\ny,q,10\n", "b", "v", 95, 400, true, false);
+    test.assert(c2 == 0);
+    borrow d2 as &d2b in {
+        test.assert(count(buffer.bytes(d2b), "<g font-family") == 1);
+    }
+    buffer.drop(heap, d2);
+    let (c3, d3) = drawn_heat(heap, "a,b,v\nx,p,0\ny,p,2\nx,q,5\ny,q,10\n", "b", "v", 96, 400, true, false);
+    test.assert(c3 == 0);
+    borrow d3 as &d3b in {
+        test.assert(count(buffer.bytes(d3b), "<g font-family") == 2);
+    }
+    buffer.drop(heap, d3);
+    return 0;
+}
+
+fn test_heatmap_refusals[&h](heap: &!h Heap) -> [heap] int {
+    let t = "a,b,v\nx,p,1\ny,q,2\n";
+    let (a, da) = drawn_heat(heap, t, "b,v", "v", 20, 6, false, false);
+    test.assert(a == 11);
+    buffer.drop(heap, da);
+    let (b, db) = drawn_heat(heap, t, "b", "", 20, 6, false, false);
+    test.assert(b == 11);
+    buffer.drop(heap, db);
+    let (c, dc) = drawn_heat(heap, t, "b", "v", 20, 6, false, true);
+    test.assert(c == 11);
+    buffer.drop(heap, dc);
+    let (d, dd) = drawn_heat(heap, "a,b,v\nx,p,1\nx,p,2\n", "b", "v", 20, 6, false, false);
+    test.assert(d == 16);
+    buffer.drop(heap, dd);
+    let (e, de) = drawn_heat(heap, "a,b,v\nx,p,z\n", "b", "v", 20, 6, false, false);
+    test.assert(e == 2);
+    buffer.drop(heap, de);
+    let (f, df) = drawn_heat(heap, t, "q", "v", 20, 6, false, false);
+    test.assert(f == 5);
+    buffer.drop(heap, df);
+    let (g, dg) = drawn_heat(heap, t, "b", "q", 20, 6, false, false);
+    test.assert(g == 5);
+    buffer.drop(heap, dg);
+    // the same pair twice, but not the same cell: x/p and p/x are different
+    let (h2, dh) = drawn_heat(heap, "a,b,v\nx,p,1\np,x,2\n", "b", "v", 20, 6, false, false);
+    test.assert(h2 == 0);
+    buffer.drop(heap, dh);
+    return 0;
+}
+
+// a cell needs a column and a row of its own in text, and the plot area 20 pixels in svg
+fn test_heatmap_size_edges[&h](heap: &!h Heap) -> [heap] int {
+    let t = "a,b,v\nx,p,1\ny,p,2\nz,p,3\n";
+    let (a, da) = drawn_heat(heap, t, "b", "v", 3, 1, false, false);
+    test.assert(a == 0);
+    buffer.drop(heap, da);
+    let (b, db) = drawn_heat(heap, t, "b", "v", 2, 1, false, false);
+    test.assert(b == 9);
+    buffer.drop(heap, db);
+    let (c, dc) = drawn_heat(heap, "a,b,v\nx,p,1\nx,q,2\nx,r,3\n", "b", "v", 4, 3, false, false);
+    test.assert(c == 0);
+    buffer.drop(heap, dc);
+    let (d, dd) = drawn_heat(heap, "a,b,v\nx,p,1\nx,q,2\nx,r,3\n", "b", "v", 4, 2, false, false);
+    test.assert(d == 9);
+    buffer.drop(heap, dd);
+    // svg: 36 + 16 = ... the labels are one byte, so x0 = 20: a width of 56 leaves 20
+    let (e, de) = drawn_heat(heap, t, "b", "v", 56, 400, true, false);
+    test.assert(e == 0);
+    buffer.drop(heap, de);
+    let (f, df) = drawn_heat(heap, t, "b", "v", 55, 400, true, false);
+    test.assert(f == 9);
+    buffer.drop(heap, df);
+    return 0;
+}
+
+// the long form that stats corr prints
+fn test_json_heatmap_pairs[&h](heap: &!h Heap) -> [heap] int {
+    let (c, r, t) = csv_of(heap, "{\"data\":{\"pairs\":[{\"x\":\"x1\",\"y\":\"x2\",\"n\":300,\"r\":0.05847881882164951},{\"x\":\"x1\",\"y\":\"y\",\"n\":300,\"r\":0.7274500944994768},{\"x\":\"x2\",\"y\":\"y\",\"n\":300,\"r\":0.22310065787101035}]}}", "data.pairs", "x,y,r");
+    test.assert(c == 0);
+    same(heap, t, "x,y,r\nx1,x2,0.05847881882164951\nx1,y,0.7274500944994768\nx2,y,0.22310065787101035\n");
+    return 0;
+}
+
+// what the mutants of the heatmap asked for: a title, ties for the least and greatest value, a cell of exactly 14 pixels, a long value, the limit of 50 categories
+
+fn drawn_heat_titled[&h, &t](heap: &!h Heap, table: &t [byte], w: int, hh: int, svg_term: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 1);
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        ac[4] = 4;
+        let (c, l, chart) = chart.draw(heap, table, "a", "b", "", "", "v", w, hh, "T", true, false, svg_term, ann, ac);
+        code = c;
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return (code, out);
+}
+
+fn test_heatmap_title[&h](heap: &!h Heap) -> [heap] int {
+    let (c, d) = drawn_heat_titled(heap, "a,b,v\nx,p,1\ny,p,3\nx,q,2\ny,q,9\n", 20, 6, false);
+    test.assert(c == 0);
+    same(heap, d, "            T\np |..........::::::::::\n  |..........::::::::::\n  |..........::::::::::\nq |,,,,,,,,,,@@@@@@@@@@\n  |,,,,,,,,,,@@@@@@@@@@\n  |,,,,,,,,,,@@@@@@@@@@\n  +--------------------\n        x         y\nmin 1  max 9\n");
+    let (c2, d2) = drawn_heat_titled(heap, "a,b,v\nx,p,0\ny,p,2\nx,q,5\ny,q,10\n", 640, 400, true);
+    test.assert(c2 == 0);
+    borrow d2 as &d2b in {
+        let t = buffer.bytes(d2b);
+        test.assert(has(t, "aria-label=\"T: 2 by 2 heatmap\""));
+        test.assert(has(t, "<text x=\"320\" y=\"20\" text-anchor=\"middle\" font-size=\"14\">T</text>\n"));
+        test.assert(has(t, "<rect x=\"20\" y=\"36\" width=\"302\" height=\"160\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.05\"/>\n"));
+    }
+    buffer.drop(heap, d2);
+    return 0;
+}
+
+// the text of the first cell that holds the least value, and of the first that holds the greatest
+fn test_heatmap_ties[&h](heap: &!h Heap) -> [heap] int {
+    let (c, d) = drawn_heat(heap, "a,b,v\nx,p,1\ny,p,1.0\nx,q,3\ny,q,3.0\n", "b", "v", 20, 6, false, false);
+    test.assert(c == 0);
+    borrow d as &db in {
+        test.assert(has(buffer.bytes(db), "min 1  max 3\n"));
+    }
+    buffer.drop(heap, d);
+    let (c2, d2) = drawn_heat(heap, "a,b,v\nx,p,1\ny,p,1.0\nx,q,3\ny,q,3.0\n", "b", "v", 640, 400, true, false);
+    test.assert(c2 == 0);
+    borrow d2 as &d2b in {
+        test.assert(has(buffer.bytes(d2b), ">min 1  max 3</text>"));
+    }
+    buffer.drop(heap, d2);
+    return 0;
+}
+
+// a cell 14 pixels high has its value in it, 13.5 does not; a value is cut to 6 bytes
+fn test_svg_heatmap_cell_edges[&h](heap: &!h Heap) -> [heap] int {
+    let t = "a,b,v\nx,p,0.123456789\ny,q,0.2\n";
+    let (a, da) = drawn_heat(heap, t, "b", "v", 640, 84, true, false);
+    test.assert(a == 0);
+    borrow da as &dab in {
+        test.assert(count(buffer.bytes(dab), "<g font-family") == 2);
+        test.assert(has(buffer.bytes(dab), ">0.1234</text>"));
+        test.assert(!has(buffer.bytes(dab), ">0.12345<"));
+    }
+    buffer.drop(heap, da);
+    let (b, db) = drawn_heat(heap, t, "b", "v", 640, 83, true, false);
+    test.assert(b == 0);
+    borrow db as &dbb in {
+        test.assert(count(buffer.bytes(dbb), "<g font-family") == 1);
+    }
+    buffer.drop(heap, db);
+    return 0;
+}
+
+// a table of `rows` rows: row i is label ai, p, 1
+fn heat_table[&h](heap: &!h Heap, rows: int) -> [heap] buffer.Buffer {
+    var t = buffer.append(heap, buffer.empty(heap, 64), "a,b,v\n");
+    var i = 0;
+    while i < rows {
+        t = buffer.push(heap, t, byte_of('a'));
+        t = buffer.push_nat(heap, t, i);
+        t = buffer.append(heap, t, ",p,1\n");
+        i = i + 1;
+    }
+    return t;
+}
+
+fn test_heatmap_fifty_categories[&h](heap: &!h Heap) -> [heap] int {
+    var codes = 0;
+    var t50 = heat_table(heap, 50);
+    borrow t50 as &a in {
+        var code = 99;
+        region r {
+            let ann = alloc_slice[r](24, 0.0);
+            let ac = alloc_slice[r](8, 0);
+            ac[4] = 4;
+            let (c, l, chart) = chart.draw(heap, buffer.bytes(a), "a", "b", "", "", "v", 100, 6, "", false, false, false, ann, ac);
+            code = c;
+            buffer.drop(heap, chart);
+        }
+        test.assert(code == 0);
+    }
+    buffer.drop(heap, t50);
+    var t51 = heat_table(heap, 51);
+    borrow t51 as &b in {
+        var code = 99;
+        region r {
+            let ann = alloc_slice[r](24, 0.0);
+            let ac = alloc_slice[r](8, 0);
+            ac[4] = 4;
+            let (c, l, chart) = chart.draw(heap, buffer.bytes(b), "a", "b", "", "", "v", 100, 6, "", false, false, false, ann, ac);
+            code = c;
+            buffer.drop(heap, chart);
+        }
+        test.assert(code == 6);
+    }
+    buffer.drop(heap, t51);
+    return 0;
+}
+
+// what the last mutants of the heatmap asked for: labels cut at 10, a label clamped at the right edge, labels that touch, a value of 7 bytes, intervals refused, 51 rows
+
+fn test_heatmap_labels_cut_and_placed[&h](heap: &!h Heap) -> [heap] int {
+    // 11 bytes are cut to 10, in text and in svg
+    let (a, da) = drawn_heat(heap, "a,b,v\nabcdefghijk,pqrstuvwxyz,1\n", "b", "v", 40, 2, false, false);
+    test.assert(a == 0);
+    borrow da as &dab in {
+        test.assert(has(buffer.bytes(dab), "pqrstuvwxy |"));
+        test.assert(!has(buffer.bytes(dab), "pqrstuvwxyz"));
+        test.assert(has(buffer.bytes(dab), "abcdefghij\n"));
+    }
+    buffer.drop(heap, da);
+    let (b, db) = drawn_heat(heap, "a,b,v\nabcdefghijk,pqrstuvwxyz,1\n", "b", "v", 640, 400, true, false);
+    test.assert(b == 0);
+    borrow db as &dbb in {
+        test.assert(has(buffer.bytes(dbb), ">pqrstuvwxy</text>"));
+        test.assert(has(buffer.bytes(dbb), ">abcdefghij</text>"));
+        test.assert(!has(buffer.bytes(dbb), "abcdefghijk</text>"));
+    }
+    buffer.drop(heap, db);
+    // a label too long for the chart is left out; the next is clamped to the right edge (5 bytes on 8 columns start at 3)
+    let (c, dc) = drawn_heat(heap, "a,b,v\nabcdefghi,p,1\nvwxyz,p,2\n", "b", "v", 8, 1, false, false);
+    test.assert(c == 0);
+    same(heap, dc, "p |....@@@@\n  +--------\n      vwxyz\nmin 1  max 2\n");
+    // labels that would touch are left out: aa, bb, cc on cells of 2 columns
+    let (d, dd) = drawn_heat(heap, "a,b,v\naa,p,1\nbb,p,2\ncc,p,3\n", "b", "v", 6, 1, false, false);
+    test.assert(d == 0);
+    same(heap, dd, "p |..++@@\n  +------\n   aa  cc\nmin 1  max 3\n");
+    return 0;
+}
+
+// a value of 7 bytes is cut to 6
+fn test_svg_heatmap_value_of_seven_bytes[&h](heap: &!h Heap) -> [heap] int {
+    let (a, da) = drawn_heat(heap, "a,b,v\nx,p,0.12345\n", "b", "v", 640, 400, true, false);
+    test.assert(a == 0);
+    borrow da as &dab in {
+        test.assert(has(buffer.bytes(dab), ">0.1234</text>"));
+        test.assert(!has(buffer.bytes(dab), ">0.12345</text>"));
+    }
+    buffer.drop(heap, da);
+    return 0;
+}
+
+fn test_heatmap_intervals_refused[&h](heap: &!h Heap) -> [heap] int {
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        ac[4] = 4;
+        let (c, l, chart) = chart.draw(heap, "a,b,v\nx,p,1\n", "a", "b", "v", "", "v", 20, 6, "", false, false, false, ann, ac);
+        code = c;
+        buffer.drop(heap, chart);
+    }
+    test.assert(code == 11);
+    return 0;
+}
+
+// 51 labels for the rows, one column: too many
+fn heat_table_rows[&h](heap: &!h Heap, rows: int) -> [heap] buffer.Buffer {
+    var t = buffer.append(heap, buffer.empty(heap, 64), "a,b,v\n");
+    var i = 0;
+    while i < rows {
+        t = buffer.append(heap, t, "x,b");
+        t = buffer.push_nat(heap, t, i);
+        t = buffer.append(heap, t, ",1\n");
+        i = i + 1;
+    }
+    return t;
+}
+
+fn test_heatmap_fifty_rows[&h](heap: &!h Heap) -> [heap] int {
+    var t50 = heat_table_rows(heap, 50);
+    borrow t50 as &a in {
+        var code = 99;
+        region r {
+            let ann = alloc_slice[r](24, 0.0);
+            let ac = alloc_slice[r](8, 0);
+            ac[4] = 4;
+            let (c, l, chart) = chart.draw(heap, buffer.bytes(a), "a", "b", "", "", "v", 40, 100, "", false, false, false, ann, ac);
+            code = c;
+            buffer.drop(heap, chart);
+        }
+        test.assert(code == 0);
+    }
+    buffer.drop(heap, t50);
+    var t51 = heat_table_rows(heap, 51);
+    borrow t51 as &b in {
+        var code = 99;
+        region r {
+            let ann = alloc_slice[r](24, 0.0);
+            let ac = alloc_slice[r](8, 0);
+            ac[4] = 4;
+            let (c, l, chart) = chart.draw(heap, buffer.bytes(b), "a", "b", "", "", "v", 40, 100, "", false, false, false, ann, ac);
+            code = c;
+            buffer.drop(heap, chart);
+        }
+        test.assert(code == 6);
+    }
+    buffer.drop(heap, t51);
+    return 0;
+}

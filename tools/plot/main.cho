@@ -220,7 +220,7 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
                 ac[6] = 1;
             } else if bytes.equal(flag, "--yhi") {
                 yhi = value;
-            } else if bytes.equal(flag, "--xhi") {
+            } else if bytes.equal(flag, "--xhi") || bytes.equal(flag, "--z") {
                 xhi = value;
             } else if bytes.equal(flag, "--json") {
                 json_path = value;
@@ -287,8 +287,11 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
                 } else if bytes.equal(value, "box") {
                     lines = false;
                     ac[4] = 3;
+                } else if bytes.equal(value, "heat") {
+                    lines = false;
+                    ac[4] = 4;
                 } else {
-                    return refuse(io, "plot.usage", "--with takes points, lines, bars, hist or box", "--with bars");
+                    return refuse(io, "plot.usage", "--with takes points, lines, bars, hist, box or heat", "--with bars");
                 }
             } else if bytes.equal(flag, "--size") {
                 let (a, b) = size_of(value);
@@ -298,7 +301,7 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
                     return refuse(io, "plot.size-invalid", "the size is WxH", "--size 60x20");
                 }
             } else {
-                return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --with --term --size --title --vline --hline --band --diag --categories --yerr --ylo --yhi --xhi --json");
+                return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --with --term --size --title --vline --hline --band --diag --categories --yerr --ylo --yhi --xhi --z --json");
             }
             k = k + 2;
         }
@@ -397,7 +400,9 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
             } else if code == 7 {
                 status = refuse(io, "plot.range-invalid", "a range is beyond 1e15 of zero, narrower than 1e-12, or 1e12 times narrower than its distance from zero", "plot the difference from a base value");
             } else if code == 11 {
-                status = refuse(io, "plot.usage", "--yerr, or --ylo with --yhi, needs one column for each series; --with hist needs --xhi and no intervals or categories, and --xhi only goes with hist; --with box needs five --y columns (lower, q1, median, q3, upper) and no intervals or categories", "--yerr e1,e2 for --y a,b; --with hist --x lo --xhi hi --y count");
+                status = refuse(io, "plot.usage", "--yerr, or --ylo with --yhi, needs one column for each series; --with hist needs --xhi and no intervals or categories, and --xhi only goes with hist; --with box needs five --y columns (lower, q1, median, q3, upper) and no intervals or categories; --with heat needs one --y column and --z, and no intervals or categories", "--yerr e1,e2 for --y a,b; --with hist --x lo --xhi hi --y count");
+            } else if code == 16 {
+                status = refuse_line(heap, io, "plot.duplicate-cell", "a cell of the heatmap is given twice", "give each pair of labels once", line);
             } else if code == 8 {
                 status = refuse(io, "plot.too-many-series", "more than 5 series", "plot at most 5 columns");
             } else if code == 9 {
