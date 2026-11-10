@@ -151,7 +151,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
     } else {
         out = buffer.push_nat(heap, out, k);
         out = put(heap, out, " series, ");
-        out = buffer.push_nat(heap, out, n);
+        out = buffer.push_nat(heap, out, axis.longest(ac, n, k));
         out = put(heap, out, " points\">");
     }
     out = nl(heap, out);
@@ -510,8 +510,8 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         while j < k {
             out = put(heap, out, "<path d=\"");
             i = 0;
-            while i < n {
-                var px = x0f + (xs[i] - xlo2) / (xhi2 - xlo2) * pw;
+            while i < axis.count(ac, n, j) {
+                var px = x0f + (axis.xat(xs, ac, n, j, i) - xlo2) / (xhi2 - xlo2) * pw;
                 if ac[7] == 1 {
                     px = x0f + (float_of(i) + 0.5) * sws;
                 }
@@ -537,7 +537,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
                 }
                 i = i + 1;
             }
-            if lines && n == 1 {
+            if lines && axis.count(ac, n, j) == 1 {
                 out = put(heap, out, " h0");
             }
             out = put(heap, out, "\"");

@@ -53,7 +53,8 @@ def datasets():
     forest = "test,difference,half\nx1,-0.057,0.062\nx2,0.012,0.041\nx3,0.104,0.055\nx4,-0.021,0.030\n"
     scores = "label,score\n" + "".join("%d,%s\n" % (l, s) for l, s in [(0, "0.08"), (0, "0.12"), (0, "0.18"), (0, "0.22"), (0, "0.31"), (0, "0.35"), (0, "0.41"), (0, "0.47"), (0, "0.52"), (0, "0.66"), (1, "0.30"), (1, "0.45"), (1, "0.55"), (1, "0.58"), (1, "0.62"), (1, "0.71"), (1, "0.77"), (1, "0.83"), (1, "0.9"), (1, "0.95")])
     converge = "iteration,solver,fun\n" + "".join("%d,%s,%s\n" % (i, s, v) for s, vs in [("gradient", ["120", "48", "19", "7.7", "3.1", "1.2", "0.5"]), ("newton", ["120", "14", "1.3", "0.09", "0.004", "0.0002", "0.00001"])] for i, v in enumerate(vs))
-    return {"net.csv": "\n".join(net) + "\n", "calibration.csv": "\n".join(cal) + "\n", "estimate.csv": "\n".join(est) + "\n", "five.csv": "\n".join(five) + "\n", "importance.csv": imp, "folds.csv": folds, "forest.csv": forest, "scores.csv": scores, "converge.csv": converge}
+    runs = "iteration,solver,fun\n" + "".join("%s,%s,%s\n" % (i, s, v) for s, ps in [("coarse", [("1", "120"), ("2", "30"), ("4", "2.1"), ("8", "0.03")]), ("fine", [("1", "120"), ("2", "70"), ("3", "33"), ("4", "15"), ("5", "6.2"), ("6", "2.4"), ("7", "0.9"), ("8", "0.3"), ("9", "0.1"), ("10", "0.03")])] for i, v in ps)
+    return {"net.csv": "\n".join(net) + "\n", "calibration.csv": "\n".join(cal) + "\n", "estimate.csv": "\n".join(est) + "\n", "five.csv": "\n".join(five) + "\n", "importance.csv": imp, "folds.csv": folds, "forest.csv": forest, "scores.csv": scores, "converge.csv": converge, "runs.csv": runs}
 
 
 # (id, title, text under it, data file, arguments, output kind)
@@ -127,6 +128,9 @@ GALLERY = [
     ("hbarstext", "Horizontal bars as text",
      "The same chart with <code>--term dumb</code>: a bar is as many glyphs as its share of the axis, at least one for a value above 0.",
      "importance.csv", ["--x", "feature", "--y", "importance", "--with", "hbars", "--term", "dumb", "--size", "50x8"], "txt"),
+    ("byruns", "Runs that do not share their x",
+     "Each group of <code>--by</code> has its own points: one run is sampled at iterations 1, 2, 4 and 8, the other at every iteration to 10. A made-up example table, not a measurement.",
+     "runs.csv", ["--x", "iteration", "--y", "fun", "--by", "solver", "--with", "lines", "--logy", "--term", "svg", "--size", "520x320", "--title", "Objective by iteration, two samplings"], "svg"),
     ("barstext", "Bars as text",
      "The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.",
      "importance.csv", ["--x", "feature", "--y", "importance", "--with", "bars", "--yerr", "std", "--term", "dumb", "--size", "56x12"], "txt"),

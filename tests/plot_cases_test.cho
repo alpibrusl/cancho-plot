@@ -21,7 +21,7 @@ fn chart_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: 
     var out = buffer.empty(heap, 1);
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](9, 0);
+        let ac = alloc_slice[r](16, 0);
         ann[0] = vl;
         ann[8] = hl;
         ann[16] = lo;

@@ -7,9 +7,9 @@ import plot.curve;
 import plot.num;
 import std.buffer;
 
-// One series for each value of a column (docs/design.md section 33): the long table (x, y, group) is written as the wide table (x, one column for each group) that the chart reads. The groups are in the order of first appearance, at most 5, and each gives the
-// x values of the first, in the same order. The codes: 0 done; 1 a quote; 2 not a number (the line); 3 a line of the wrong width (the line); 4 no rows; 5 a column missing; 6 more than 4999 rows; 8 more than 5 groups;
-// 10 a control byte in a group's text; 20 the groups do not line up (the line of the first row that does not, or 0 when a group has fewer rows). Answers (code, line, groups, table).
+// One series for each value of a column (docs/design.md sections 33 and 37): the long table (x, y, group) is written as a table with a pair of columns for each group, `x,name,x,name,..`, and as many rows as the largest group has; where a smaller group has run out, its two cells are
+// empty. Groups are in the order of first appearance, at most 5, and keep the order of their rows. The codes: 0 done; 1 a quote; 2 not a number (the line); 3 a line of the wrong width (the line); 4 no rows; 5 a column missing; 6 more than 4999 rows; 8 more than 5 groups;
+// 10 a control byte in a group's text. Answers (code, line, groups, table).
 
 fn same_text[&t](text: &t [byte], a: int, b: int, c: int, d: int) -> [] bool {
     if b - a != d - c {
@@ -58,122 +58,109 @@ pub fn to_csv[&h, &t, &x, &y, &g](heap: &!h Heap, text: &t [byte], xspec: &x [by
     var groups = 0;
     let xb = box_slice(heap, n, 0.0);
     let yb = box_slice(heap, n, 0.0);
+    // the group of each row, and the row of the p-th point of each group
     let gb = box_slice(heap, n, 0);
-    let x0b = box_slice(heap, n, 0.0);
-    let cb = box_slice(heap, 5 * n, 0.0);
+    let ib = box_slice(heap, 5 * n, 0);
     borrow mut xb as &!xw in {
         borrow mut yb as &!yw in {
             borrow mut gb as &!gw in {
-                borrow mut x0b as &!x0w in {
-                    borrow mut cb as &!cw in {
-                        let xs = contents(xw);
-                        let ys = contents(yw);
-                        let gi = contents(gw);
-                        let x0 = contents(x0w);
-                        let cells = contents(cw);
-                        region r {
-                            // the text of each group, as the start and the end of a cell, and how many rows each has so far
-                            let gs = alloc_slice[r](10, 0);
-                            let seen = alloc_slice[r](5, 0);
-                            var row = 0;
-                            var pos = csv.next_line(text, hend);
-                            while row < n && code == 0 {
-                                let end = csv.line_end(text, pos);
-                                line = row + 2;
-                                if csv.cells(text, pos, end) != width {
-                                    code = 3;
+                borrow mut ib as &!iw in {
+                    let xs = contents(xw);
+                    let ys = contents(yw);
+                    let gi = contents(gw);
+                    let idx = contents(iw);
+                    region r {
+                        // the text of each group, as the start and the end of a cell, and how many rows each has
+                        let gs = alloc_slice[r](10, 0);
+                        let cnt = alloc_slice[r](5, 0);
+                        var row = 0;
+                        var pos = csv.next_line(text, hend);
+                        while row < n && code == 0 {
+                            let end = csv.line_end(text, pos);
+                            line = row + 2;
+                            if csv.cells(text, pos, end) != width {
+                                code = 3;
+                            } else {
+                                let (a, b) = csv.cell(text, pos, end, xcol);
+                                let (c, d) = csv.cell(text, pos, end, ycol);
+                                let (e, f) = csv.cell(text, pos, end, gcol);
+                                let (xok, xv) = num.number(text[a..b]);
+                                let (yok, yv) = num.number(text[c..d]);
+                                if !xok || !yok {
+                                    code = 2;
+                                } else if curve.has_control(text[e..f]) {
+                                    code = 10;
                                 } else {
-                                    let (a, b) = csv.cell(text, pos, end, xcol);
-                                    let (c, d) = csv.cell(text, pos, end, ycol);
-                                    let (e, f) = csv.cell(text, pos, end, gcol);
-                                    let (xok, xv) = num.number(text[a..b]);
-                                    let (yok, yv) = num.number(text[c..d]);
-                                    if !xok || !yok {
-                                        code = 2;
-                                    } else if curve.has_control(text[e..f]) {
-                                        code = 10;
-                                    } else {
-                                        xs[row] = xv;
-                                        ys[row] = yv;
-                                        var found = 0 - 1;
-                                        var j = 0;
-                                        while j < groups {
-                                            if found < 0 && same_text(text, gs[2 * j], gs[2 * j + 1], e, f) {
-                                                found = j;
-                                            }
-                                            j = j + 1;
+                                    xs[row] = xv;
+                                    ys[row] = yv;
+                                    var found = 0 - 1;
+                                    var j = 0;
+                                    while j < groups {
+                                        if found < 0 && same_text(text, gs[2 * j], gs[2 * j + 1], e, f) {
+                                            found = j;
                                         }
-                                        if found < 0 {
-                                            if groups == 5 {
-                                                code = 8;
-                                            } else {
-                                                gs[2 * groups] = e;
-                                                gs[2 * groups + 1] = f;
-                                                found = groups;
-                                                groups = groups + 1;
-                                            }
+                                        j = j + 1;
+                                    }
+                                    if found < 0 {
+                                        if groups == 5 {
+                                            code = 8;
+                                        } else {
+                                            gs[2 * groups] = e;
+                                            gs[2 * groups + 1] = f;
+                                            found = groups;
+                                            groups = groups + 1;
                                         }
-                                        gi[row] = found;
+                                    }
+                                    gi[row] = found;
+                                    if code == 0 {
+                                        idx[found * n + cnt[found]] = row;
+                                        cnt[found] = cnt[found] + 1;
                                     }
                                 }
-                                pos = csv.next_line(text, end);
-                                row = row + 1;
                             }
-                            if code == 0 {
-                                // the x values of the first group set the rows; the others must match them position by position
-                                var m = 0;
-                                var q = 0;
-                                while q < n {
-                                    if gi[q] == 0 {
-                                        x0[m] = xs[q];
-                                        m = m + 1;
-                                    }
-                                    q = q + 1;
+                            pos = csv.next_line(text, end);
+                            row = row + 1;
+                        }
+                        if code == 0 {
+                            var m = 0;
+                            var gj = 0;
+                            while gj < groups {
+                                if cnt[gj] > m {
+                                    m = cnt[gj];
                                 }
-                                q = 0;
-                                while q < n && code == 0 {
-                                    let g0 = gi[q];
-                                    let p = seen[g0];
-                                    if p >= m || xs[q] != x0[p] {
-                                        code = 20;
-                                        line = q + 2;
-                                    } else {
-                                        cells[g0 * m + p] = ys[q];
-                                        seen[g0] = p + 1;
-                                    }
-                                    q = q + 1;
+                                gj = gj + 1;
+                            }
+                            let (xa, xe) = csv.cell(text, 0, hend, xcol);
+                            gj = 0;
+                            while gj < groups {
+                                if gj > 0 {
+                                    out = buffer.push(heap, out, byte_of(','));
                                 }
-                                var g1 = 1;
-                                while g1 < groups && code == 0 {
-                                    if seen[g1] != m {
-                                        code = 20;
-                                        line = 0;
-                                    }
-                                    g1 = g1 + 1;
-                                }
-                                if code == 0 {
-                                    let (xa, xe) = csv.cell(text, 0, hend, xcol);
-                                    out = buffer.append(heap, out, text[xa..xe]);
-                                    var gj = 0;
-                                    while gj < groups {
+                                out = buffer.append(heap, out, text[xa..xe]);
+                                out = buffer.push(heap, out, byte_of(','));
+                                out = buffer.append(heap, out, text[gs[2 * gj]..gs[2 * gj + 1]]);
+                                gj = gj + 1;
+                            }
+                            out = buffer.push(heap, out, byte_of(10));
+                            var p = 0;
+                            while p < m {
+                                gj = 0;
+                                while gj < groups {
+                                    if gj > 0 {
                                         out = buffer.push(heap, out, byte_of(','));
-                                        out = buffer.append(heap, out, text[gs[2 * gj]..gs[2 * gj + 1]]);
-                                        gj = gj + 1;
                                     }
-                                    out = buffer.push(heap, out, byte_of(10));
-                                    var p = 0;
-                                    while p < m {
-                                        out = curve.put_cell(heap, out, x0[p], false);
-                                        gj = 0;
-                                        while gj < groups {
-                                            out = buffer.push(heap, out, byte_of(','));
-                                            out = curve.put_cell(heap, out, cells[gj * m + p], false);
-                                            gj = gj + 1;
-                                        }
-                                        out = buffer.push(heap, out, byte_of(10));
-                                        p = p + 1;
+                                    if p < cnt[gj] {
+                                        let q = idx[gj * n + p];
+                                        out = curve.put_cell(heap, out, xs[q], false);
+                                        out = buffer.push(heap, out, byte_of(','));
+                                        out = curve.put_cell(heap, out, ys[q], false);
+                                    } else {
+                                        out = buffer.push(heap, out, byte_of(','));
                                     }
+                                    gj = gj + 1;
                                 }
+                                out = buffer.push(heap, out, byte_of(10));
+                                p = p + 1;
                             }
                         }
                     }
@@ -181,8 +168,7 @@ pub fn to_csv[&h, &t, &x, &y, &g](heap: &!h Heap, text: &t [byte], xspec: &x [by
             }
         }
     }
-    unbox_slice(heap, cb);
-    unbox_slice(heap, x0b);
+    unbox_slice(heap, ib);
     unbox_slice(heap, gb);
     unbox_slice(heap, yb);
     unbox_slice(heap, xb);

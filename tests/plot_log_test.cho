@@ -16,7 +16,7 @@ fn log_chart[&h, &t](heap: &!h Heap, table: &t [byte], svg_term: bool, nh: int, 
     var rb = buffer.empty(heap, 1);
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](9, 0);
+        let ac = alloc_slice[r](16, 0);
         ann[8] = hl;
         ac[1] = nh;
         ac[3] = diag;
@@ -168,12 +168,15 @@ fn by_refused[&h, &t](heap: &!h Heap, input: &t [byte], want: int, want_line: in
     return test.assert(line == want_line);
 }
 
-fn test_by_pivots[&h](heap: &!h Heap) -> [heap] int {
-    pivot_is(heap, "x,g,y\n1,a,100\n2,a,10\n1,b,50\n2,b,20\n", "x,a,b\n1,100,50\n2,10,20\n", 2);
+fn test_by_pairs_of_columns[&h](heap: &!h Heap) -> [heap] int {
+    pivot_is(heap, "x,g,y\n1,a,100\n2,a,10\n1,b,50\n2,b,20\n", "x,a,x,b\n1,100,1,50\n2,10,2,20\n", 2);
     // the rows of the groups may be interleaved; the order of the columns is the order of first appearance
-    pivot_is(heap, "g,y,x\nb,50,1\na,100,1\nb,20,2\na,10,2\n", "x,b,a\n1,50,100\n2,20,10\n", 2);
+    pivot_is(heap, "g,y,x\nb,50,1\na,100,1\nb,20,2\na,10,2\n", "x,b,x,a\n1,50,1,100\n2,20,2,10\n", 2);
     pivot_is(heap, "x,y,g\n5,7,only\n6,8,only\n", "x,only\n5,7\n6,8\n", 1);
-    pivot_is(heap, "x,y,g\n1,1,a\n1,2,b\n1,3,c\n1,4,d\n1,5,e\n", "x,a,b,c,d,e\n1,1,2,3,4,5\n", 5);
+    pivot_is(heap, "x,y,g\n1,1,a\n1,2,b\n1,3,c\n1,4,d\n1,5,e\n", "x,a,x,b,x,c,x,d,x,e\n1,1,1,2,1,3,1,4,1,5\n", 5);
+    // groups of another length and other x values: the shorter one has empty cells after its last point
+    pivot_is(heap, "x,y,g\n1,1,a\n2,4,a\n3,9,a\n5,2,b\n", "x,a,x,b\n1,1,5,2\n2,4,,\n3,9,,\n", 2);
+    pivot_is(heap, "x,y,g\n5,2,b\n1,1,a\n2,4,a\n6,3,b\n", "x,b,x,a\n5,2,1,1\n6,3,2,4\n", 2);
     return 0;
 }
 
@@ -186,10 +189,6 @@ fn test_by_refusals[&h](heap: &!h Heap) -> [heap] int {
     by_refused(heap, "x,y,g\n1,2,a\n1,2\n", 3, 3);
     by_refused(heap, "x,y,g\n1,1,a\n1,1,b\n1,1,c\n1,1,d\n1,1,e\n1,1,f\n", 8, 7);
     by_refused(heap, "x,y,g\n1,1,a\n1,1,\t\n", 10, 3);
-    // b gives another x at the first position; b has a row too many; b has a row too few
-    by_refused(heap, "x,y,g\n1,1,a\n2,1,a\n1,1,b\n3,1,b\n", 20, 5);
-    by_refused(heap, "x,y,g\n1,1,a\n1,1,b\n2,1,b\n", 20, 4);
-    by_refused(heap, "x,y,g\n1,1,a\n2,1,a\n1,1,b\n", 20, 0);
     return 0;
 }
 
@@ -200,7 +199,7 @@ fn log_chart2[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], n
     var rb = buffer.empty(heap, 1);
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](9, 0);
+        let ac = alloc_slice[r](16, 0);
         ann[16] = lo;
         ann[17] = hi;
         ac[2] = nb;
@@ -272,7 +271,121 @@ fn test_by_limits_and_columns[&h](heap: &!h Heap) -> [heap] int {
     buffer.drop(heap, t);
     by_refused(heap, "a,y,g\n1,2,a\n", 5, 0);
     by_refused(heap, "x,b,g\n1,2,a\n", 5, 0);
-    // a row too many whose x is 0
-    by_refused(heap, "x,y,g\n1,1,a\n1,1,b\n0,1,b\n", 20, 4);
     return 0;
+}
+
+// a table of pairs of columns (section 37): its chart with the points of each series at their own x; (code, line, text)
+fn paired_chart[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], svg_term: bool, logy: bool, kind: int, w: int, hh: int, lines: bool) -> [heap] (int, int, buffer.Buffer) {
+    var rc = 0;
+    var rl = 0;
+    var rb = buffer.empty(heap, 1);
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](16, 0);
+        ac[9] = 1;
+        ac[4] = kind;
+        if logy {
+            ac[8] = 1;
+        }
+        let (code, line, out) = chart.draw(heap, table, "x", ycols, "", "", "", w, hh, "", false, lines, svg_term, ann, ac);
+        rc = code;
+        rl = line;
+        buffer.drop(heap, rb);
+        rb = out;
+    }
+    return (rc, rl, rb);
+}
+
+fn paired_is[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: int, hh: int, want: &static [byte]) -> [heap] int {
+    let (code, line, out) = paired_chart(heap, table, ycols, false, false, 0, w, hh, false);
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.equal(buffer.bytes(g), want);
+    }
+    buffer.drop(heap, out);
+    return test.assert(ok);
+}
+
+fn paired_refused[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], logy: bool, kind: int, want: int, want_line: int) -> [heap] int {
+    let (code, line, out) = paired_chart(heap, table, ycols, false, logy, kind, 20, 5, false);
+    buffer.drop(heap, out);
+    test.assert(code == want);
+    return test.assert(line == want_line);
+}
+
+fn test_paired_series_at_their_own_x[&h](heap: &!h Heap) -> [heap] int {
+    // a: (1,1) (2,2) (3,3), b: (1,3) (3,1); the x range 1 to 3 is the same for both
+    paired_is(heap, "x,a,x,b\n1,1,1,3\n2,2,3,1\n3,3,,\n", "a,b", 20, 5, "3.0 |+                  *\n2.5 |\n2.0 |          *\n1.5 |\n1.0 |*                  +\n    +--------------------\n     1.0 1.5  2.0  2.5\n* a  + b\n");
+    // b has the larger x values and widens the range to 7: a's points are on the left, b's on the right
+    paired_is(heap, "x,a,x,b\n1,1,5,3\n2,2,7,1\n3,3,,\n", "a,b", 20, 5, "3.0 |      *      +\n2.5 |\n2.0 |   *\n1.5 |\n1.0 |*                  +\n    +--------------------\n     1  2  3   4  5  6  7\n* a  + b\n");
+    return 0;
+}
+
+fn test_paired_svg_counts_and_log[&h](heap: &!h Heap) -> [heap] int {
+    let (code, line, out) = paired_chart(heap, "x,a,x,b\n1,1,5,2\n2,4,,\n3,9,,\n", "a,b", true, false, 0, 640, 400, false);
+    test.assert(code == 0);
+    borrow out as &g in {
+        // the label counts the longest series (3), and b draws one point only: one `M x y h0` in its path
+        test.assert(bytes.find(buffer.bytes(g), "aria-label=\"2 series, 3 points\"") >= 0);
+        test.assert(bytes.find(buffer.bytes(g), " h0\"") >= 0);
+    }
+    buffer.drop(heap, out);
+    // the empty cells of a shorter series are not values: on a log axis they are not refused, a value of 0 is
+    let (c2, l2, o2) = paired_chart(heap, "x,a,x,b\n1,10,1,100\n2,1000,,\n", "a,b", false, true, 0, 20, 5, false);
+    buffer.drop(heap, o2);
+    test.assert(c2 == 0);
+    paired_refused(heap, "x,a,x,b\n1,10,1,100\n2,0,,\n", "a,b", true, 0, 19, 3);
+    return 0;
+}
+
+fn test_paired_refusals[&h](heap: &!h Heap) -> [heap] int {
+    // a gap inside a series; half a pair is not a number; the wrong number of columns; a kind that has no pairs
+    paired_refused(heap, "x,a,x,b\n1,1,1,1\n,,2,2\n3,3,3,3\n", "a,b", false, 0, 3, 4);
+    paired_refused(heap, "x,a,x,b\n1,1,1,\n", "a,b", false, 0, 2, 2);
+    paired_refused(heap, "x,a,x,b\n1,1,1,1\n", "a", false, 0, 11, 0);
+    paired_refused(heap, "x,a,x,b\n1,1,1,1\n", "a,b", false, 1, 11, 0);
+    return 0;
+}
+
+fn test_paired_lines_and_the_half_pair[&h](heap: &!h Heap) -> [heap] int {
+    // a: (1,1) (2,4) (3,9), b: (5,2): in svg the path of a joins its three points, b's one point is `h0`
+    let (code, line, out) = paired_chart(heap, "x,a,x,b\n1,1,5,2\n2,4,,\n3,9,,\n", "a,b", true, false, 0, 640, 400, true);
+    test.assert(code == 0);
+    borrow out as &g in {
+        test.assert(bytes.find(buffer.bytes(g), "<path d=\"M 28 321.6 L 177 218.4 L 326 46.4\"") >= 0);
+        test.assert(bytes.find(buffer.bytes(g), "<path d=\"M 624 287.2 h0\"") >= 0);
+    }
+    buffer.drop(heap, out);
+    // the same in text: the line of a runs from the bottom left up to the right, b is one glyph at the right
+    let (c2, l2, o2) = paired_chart(heap, "x,a,x,b\n1,1,5,2\n3,9,,\n", "a,b", false, false, 0, 20, 5, true);
+    test.assert(c2 == 0);
+    var ok = false;
+    borrow o2 as &g2 in {
+        ok = bytes.equal(buffer.bytes(g2), "10 |         **\n 8 |       **\n 6 |    ***\n 4 |  **\n 2 |**                 +\n   +--------------------\n    1.0 2.0  3.0  4.0\n* a  + b\n");
+    }
+    buffer.drop(heap, o2);
+    test.assert(ok);
+    // a pair with its x empty and its y given is not a gap
+    paired_refused(heap, "x,a,x,b\n1,1,,5\n", "a,b", false, 0, 2, 2);
+    // a trailing row of empty pairs counts for no point: the label says 1
+    let (c3, l3, o3) = paired_chart(heap, "x,a,x,b\n1,1,1,1\n,,,\n", "a,b", true, false, 0, 640, 400, false);
+    test.assert(c3 == 0);
+    borrow o3 as &g3 in {
+        test.assert(bytes.find(buffer.bytes(g3), "aria-label=\"2 series, 1 points\"") >= 0);
+    }
+    buffer.drop(heap, o3);
+    return 0;
+}
+
+fn test_paired_second_series_joins_its_own_points[&h](heap: &!h Heap) -> [heap] int {
+    // a runs from x 1 to 2, b from 3 to 4: b's segment is from column 13 to 19, not from a's x
+    let (code, line, out) = paired_chart(heap, "x,a,x,b\n1,1,3,2\n2,2,4,1\n", "a,b", false, false, 0, 20, 5, true);
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.equal(buffer.bytes(g), "2.0 |      *      +\n1.8 |    **        ++\n1.6 |   *            +\n1.4 | **              ++\n1.2 |*                  +\n    +--------------------\n     1.0  2.0 2.5   3.5\n* a  + b\n");
+    }
+    buffer.drop(heap, out);
+    return test.assert(ok);
 }

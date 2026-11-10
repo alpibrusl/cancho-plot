@@ -488,7 +488,7 @@ A first run killed 34 of 41; the seven that lived were real gaps, and tests were
 
 *Range and ticks.* The range is widened to whole exponents (floor of the low, ceil of the high; one decade when they are equal), and the ticks are at whole exponents, with the step 1, 2 or 5 decades that section 10 picks for the span (never a fraction of a decade: a step below 1 is made 1). A tick at the exponent x is labelled with the number 10^x: digits for 1 to 1000000 (`1`, `10`, `1000000`), `0.1` to `0.000001`, and `1e7`, `1e-7` beyond. Claim to measure: the tick labels of a table that spans 1 to 1000 are `1 10 100 1000` and the point at 100 is at the same height as the tick `100`.
 
-**`--by COL`.** One series for each value of the column COL (text, the same cell rules as categories: no quote, no comma, no control byte), taken from a long table. Series share the x column in this program, so a group must give the same x values as the first group, in the same order: the first group's rows set the x values; any other group with another count, or another x at the same position, is `plot.by-misaligned` with the line of the first row that differs. At most 5 groups (`plot.too-many-series`), named by their text in order of first appearance. `--y` takes one column; `--by` is not combined with `--curve`, intervals, or `bars|hist|box|heat`. `--json` composes (the by field is read with the others). Not in this slice: groups with different x values (it needs a per-series x in the drawing code).
+**`--by COL`.** (Corrected by section 37: the groups no longer have to line up; `plot.by-misaligned` is gone.) One series for each value of the column COL (text, the same cell rules as categories: no quote, no comma, no control byte), taken from a long table. Series share the x column in this program, so a group must give the same x values as the first group, in the same order: the first group's rows set the x values; any other group with another count, or another x at the same position, is `plot.by-misaligned` with the line of the first row that differs. At most 5 groups (`plot.too-many-series`), named by their text in order of first appearance. `--y` takes one column; `--by` is not combined with `--curve`, intervals, or `bars|hist|box|heat`. `--json` composes (the by field is read with the others). Not in this slice: groups with different x values (it needs a per-series x in the drawing code).
 
 **Gate.** `cancho test`: hand-worked charts with `--logy` in both terminals (the axis of 1 to 1000, a single decade, a half-decade range widened to whole exponents), every refusal; `--by` pivots by hand, every refusal; mutants as before.
 
@@ -547,3 +547,27 @@ The first run killed 33 of 47; the gaps (the maximum over the later series, a la
 **Not measured:** bars on a table with hundreds of categories in `dumb` (the rows needed are n k, each a line; the limit is the size rule above), and negative bars (refused, section 35).
 
 **Gallery.** `hbars` and `hbarstext` draw `site/data/importance.csv` (the permutation importance of the first chart, as horizontal bars).
+
+## 37. Slice 5h: `--by` with an x for each group [choice, before the code]
+
+Section 33 made a group give the x values of the first, in order, because the drawing code shares one x column. That excluded the commonest uses (a ROC curve for each model, a trace of unequal length for each solver). The shared x is dropped.
+
+**What changes.** `--by COL` takes the long table (x, y, group) and gives each group its own points, in the order of its rows; the groups need not have the same count or the same x values. The refusal `plot.by-misaligned` is removed (the rule it enforced is gone); the others stay (at most 5 groups, the bytes of a group's text, the columns, the numbers, the 4,999 rows).
+
+**How.** `by` still writes a table for the chart to read, now with a pair of columns for each group, `x, name, x, name, ..`, and as many rows as the largest group has, an empty pair of cells where a smaller group has run out. The chart reads such a table when it is told so (a new mode `ac[9] = 1`; `ac[10 + j]` is the number of points of series j): series j has its x in the column 2 j and its y in 2 j + 1, `xs` holds the k columns of n x values as `ys` holds the k columns of y values, and everything that loops over the points of series j stops at its count. An empty pair is only allowed after the last point of a series (a gap inside it is `plot.csv-shape`, the cells of a pair are both given or both empty). The range of the axes is the range of the points that exist (not the padding). With `--logy` only the existing points must be above 0.
+
+**Claim to measure.** For a table whose groups do line up, the chart is the same as the one section 33's pivot drew (the golden of `logby` does not change by one byte), and for two groups of different length and different x values every point is at the place its own x and y give.
+
+## 38. Slice 5h, built [measured]
+
+`--by` gives each group its own x as section 37 says: `by.cho` writes the pairs of columns, `chart.cho` reads them when `ac[9] = 1` (`ac[10 + j]` the count of series j), and `axis.cho` (`xat`, `count`, `longest`) is what the renderers ask for the x and the count of a series. `ac` grew from 9 to 16 integers. The test file `tests/plot_log_test.cho` has 17 cases now (85 + 21 + 15 + 17 + 10 in the five files).
+
+**The claim of section 37 holds.** After the change, `site/gallery/logby.svg` (groups that line up) is **byte for byte** the file it was before, and the new `byruns` chart (a run sampled at iterations 1, 2, 4 and 8, the other at every iteration to 10) is drawn by the same code. For unequal groups the points are where their own x and y put them: checked by hand on the text charts (a at x 1 to 3 and b at x 5 and 7, so the range is 1 to 7: columns 0, 3 and 6 for a and 13 and 19 for b), and the segment of the second series joins its own points (columns 13 to 19), not the x of the first series.
+
+**What the gaps are.** An empty pair of cells is allowed after the last point of a series and nowhere before it: a gap inside a series is `plot.csv-shape` with the line of the first point after the gap; a pair with only one of its cells given is `plot.not-numeric`. A row of empty pairs at the end counts for no point (the svg label says how many the longest series has).
+
+**Mutants.** 37 single-line mutants of the code for per-series x (the extent, the loops of both terminals, the reading of the pairs, `by.cho`): 35 killed, 2 survive, both equivalent. The first run left 10 of 39 alive and also showed two pieces of dead code (the first loop of the x range, which the per-series loop already covered, and the column of a series that the pairs mode never reads): both were removed, not tested. The two that live: `ac[10 + pq] != row` to `> row` (the count of a series is never above the row being read) and `cnt[gj] > m` to `>=` (assigns the same value). One real gap was closed on the way: the x of the previous point in the text lines of the second series now has its test (the last case of the file).
+
+**Gallery.** `byruns` (see above), from `site/data/runs.csv` (made up, said so on the page).
+
+**Changed from section 33:** `plot.by-misaligned` and its code 20 no longer exist.

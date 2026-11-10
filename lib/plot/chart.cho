@@ -214,9 +214,24 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
         if code == 0 && n > 5000 {
             code = 6;
         }
+        if code == 0 && ac[9] == 1 && (ac[4] != 0 || ke > 0 || ac[7] == 1 || len(xhi) > 0 || csv.cells(text, 0, hend) != 2 * ycount) {
+            code = 11;
+        }
         if code == 0 {
             let ncols = csv.cells(text, 0, hend);
-            let xsb = box_slice(heap, n, 0.0);
+            var paired_k = 1;
+            if ac[9] == 1 {
+                paired_k = ycount;
+                // the pair of columns of each series (section 37): the name of a series is the header of the second of its pair
+                var pj = 0;
+                while pj < ycount {
+                    let (na, nb) = csv.cell(text, 0, hend, 2 * pj + 1);
+                    ns[pj] = na;
+                    ne[pj] = nb;
+                    pj = pj + 1;
+                }
+            }
+            let xsb = box_slice(heap, n * paired_k, 0.0);
             var extra = 0;
             if ac[4] == 2 || ac[4] == 4 {
                 extra = 1;
@@ -246,6 +261,8 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                     if has_control(text[a..b]) {
                                         code = 10;
                                     }
+                                } else if ac[9] == 1 {
+                                    // each series reads its own pair of cells below (section 37)
                                 } else {
                                     let (ok, v) = num.number(text[a..b]);
                                     if !ok {
@@ -271,6 +288,31 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                         cl[4 * n + 2 * row + 1] = d3;
                                     }
                                 }
+                                if ac[9] == 1 {
+                                    var pq = 0;
+                                    while pq < ycount && code == 0 {
+                                        let (pxa, pxb) = csv.cell(text, at, end, 2 * pq);
+                                        let (pya, pyb) = csv.cell(text, at, end, 2 * pq + 1);
+                                        if pxa == pxb && pya == pyb {
+                                            // the series has run out: nothing may follow
+                                        } else if ac[10 + pq] != row {
+                                            code = 3;
+                                            line = row + 2;
+                                        } else {
+                                            let (pxok, pxv) = num.number(text[pxa..pxb]);
+                                            let (pyok, pyv) = num.number(text[pya..pyb]);
+                                            if !pxok || !pyok {
+                                                code = 2;
+                                                line = row + 2;
+                                            } else {
+                                                xs[pq * n + row] = pxv;
+                                                ys[pq * n + row] = pyv;
+                                                ac[10 + pq] = row + 1;
+                                            }
+                                        }
+                                        pq = pq + 1;
+                                    }
+                                }
                                 var q = 0;
                                 if ac[4] == 4 {
                                     // the row of a heatmap cell is a label too
@@ -282,7 +324,7 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                     }
                                     q = ycount;
                                 }
-                                while q < ycount && code == 0 {
+                                while q < ycount && code == 0 && ac[9] == 0 {
                                     let (c, d) = csv.cell(text, at, end, yc[q]);
                                     let (ok2, v2) = num.number(text[c..d]);
                                     if !ok2 {
@@ -338,7 +380,8 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                             // the values and the markers by their log10; one that is not above 0 has none (section 33)
                             var q = 0;
                             while q < ycount * n && code == 0 {
-                                if ys[q] > 0.0 {
+                                if q % n >= axis.count(ac, n, q / n) {
+                                } else if ys[q] > 0.0 {
                                     ys[q] = math.log10(ys[q]);
                                 } else {
                                     code = 19;

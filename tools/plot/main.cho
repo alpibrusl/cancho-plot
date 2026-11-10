@@ -167,7 +167,7 @@ fn do_chart[&h, &i, &g](heap: &!h Heap, io: &!i Io, args: &g Args) -> [heap, io_
     var status = 2;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](9, 0);
+        let ac = alloc_slice[r](16, 0);
         status = do_chart_with(heap, io, args, ann, ac);
     }
     return status;
@@ -411,6 +411,7 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
         }
         buffer.drop(heap, text);
         text = table;
+        ac[9] = 1;
         xspec = "1";
         if groups == 1 {
             yspec = "2";
@@ -459,8 +460,6 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
         status = refuse(io, "plot.too-many-series", "more than 5 groups", "plot at most 5 groups");
     } else if curve_code == 10 {
         status = refuse(io, "plot.text-invalid", "a group has a control byte in its text", "remove it");
-    } else if curve_code == 20 {
-        status = refuse_line(heap, io, "plot.by-misaligned", "a group does not give the x values of the first group in the same order", "give every group the same x values, one row each", curve_line);
     } else if curve_code == 18 {
         status = refuse(io, "plot.roc-classes", "the ROC needs both classes: a 0 and a 1 in the label column", "check the label column");
     } else if curve_code == 1 {

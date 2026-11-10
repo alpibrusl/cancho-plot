@@ -57,24 +57,28 @@ pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, an
     var ylo = ys[0];
     var yhi = ys[0];
     var i = 0;
-    while i < n {
-        if xs[i] < xlo {
-            xlo = xs[i];
+    // the points that exist: a series of its own x has as many as it counts (section 37)
+    var s = 0;
+    while s < k {
+        i = 0;
+        while i < count(ac, n, s) {
+            let yv = ys[s * n + i];
+            if yv < ylo {
+                ylo = yv;
+            }
+            if yv > yhi {
+                yhi = yv;
+            }
+            let xv = xat(xs, ac, n, s, i);
+            if xv < xlo {
+                xlo = xv;
+            }
+            if xv > xhi {
+                xhi = xv;
+            }
+            i = i + 1;
         }
-        if xs[i] > xhi {
-            xhi = xs[i];
-        }
-        i = i + 1;
-    }
-    i = 0;
-    while i < k * n {
-        if ys[i] < ylo {
-            ylo = ys[i];
-        }
-        if ys[i] > yhi {
-            yhi = ys[i];
-        }
-        i = i + 1;
+        s = s + 1;
     }
     i = 0;
     while i < ac[0] {
@@ -169,4 +173,33 @@ pub fn label_y[&h, &c](heap: &!h Heap, out: buffer.Buffer, k: int, m: int, e: in
         return ticks.label_log(heap, out, k, m, e);
     }
     return ticks.label(heap, out, k, m, e);
+}
+
+// the x of point i of series j: the one column of x values, or the column of the series when each has its own (ac[9] = 1, section 37)
+pub fn xat[&a, &c](xs: &a [float], ac: &c [int], n: int, j: int, i: int) -> [] float {
+    if ac[9] == 1 {
+        return xs[j * n + i];
+    }
+    return xs[i];
+}
+
+// how many points series j has: n, or what ac[10 + j] says when each series has its own x
+pub fn count[&c](ac: &c [int], n: int, j: int) -> [] int {
+    if ac[9] == 1 {
+        return ac[10 + j];
+    }
+    return n;
+}
+
+// how many points the longest of the k series has (n when they share their x)
+pub fn longest[&c](ac: &c [int], n: int, k: int) -> [] int {
+    var t = 0;
+    var j = 0;
+    while j < k {
+        if count(ac, n, j) > t {
+            t = count(ac, n, j);
+        }
+        j = j + 1;
+    }
+    return t;
 }
