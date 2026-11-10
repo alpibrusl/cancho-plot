@@ -100,7 +100,7 @@ pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, an
         i = i + 1;
     }
     // bars and histogram bars start at 0 (sections 20 and 25)
-    if ac[4] >= 1 {
+    if ac[4] == 1 || ac[4] == 2 {
         if ylo > 0.0 {
             ylo = 0.0;
         }

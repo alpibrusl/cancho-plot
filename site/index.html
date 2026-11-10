@@ -629,6 +629,60 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 </pre>
 <p class="cmd"><code>plot --json data.columns.0.histogram --x lo --xhi hi --y count --with hist --term dumb --size 60x10 &lt; stats-describe.json</code> <a href="data/stats-describe.json">the table</a> <a href="gallery/histtext.txt">the text</a></p>
 </figure>
+<figure id="jsonbox">
+<h3>Box plots from stats describe</h3>
+<p>The same document: <code>min</code>, the three quantiles asked for (<code>quantiles.0.value</code> to <code>quantiles.2.value</code>, dotted paths with an index) and <code>max</code> are the five numbers of a box for each column. A box plot takes exactly five <code>--y</code> columns, in that order.</p>
+<div class="chart"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="img" aria-label="stats describe: x1 and x2: 2 boxes">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 356 H 624"/>
+<path d="M 36 356 h-4"/>
+<path d="M 36 292 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 164 h-4"/>
+<path d="M 36 100 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 183 356 v4"/>
+<path d="M 477 356 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="320" y="20" text-anchor="middle" font-size="14">stats describe: x1 and x2</text>
+<text x="28" y="360" text-anchor="end">0.0</text>
+<text x="28" y="296" text-anchor="end">0.2</text>
+<text x="28" y="232" text-anchor="end">0.4</text>
+<text x="28" y="168" text-anchor="end">0.6</text>
+<text x="28" y="104" text-anchor="end">0.8</text>
+<text x="28" y="40" text-anchor="end">1.0</text>
+<text x="183" y="374" text-anchor="middle">x1</text>
+<text x="477" y="374" text-anchor="middle">x2</text>
+</g>
+<rect x="109.5" y="124.96" width="147" height="141.44" fill="var(--series-1, #0550ae)" fill-opacity="0.35" stroke="currentColor" stroke-width="1"/>
+<rect x="403.5" y="117.92" width="147" height="164.48" fill="var(--series-1, #0550ae)" fill-opacity="0.35" stroke="currentColor" stroke-width="1"/>
+<path d="M 183 124.96 V 38.56 M 183 266.4 V 356 M 177 38.56 h12 M 177 356 h12 M 477 117.92 V 38.56 M 477 282.4 V 356 M 471 38.56 h12 M 471 356 h12" fill="none" stroke="currentColor" stroke-width="1"/>
+<path d="M 109.5 194.72 h147 M 403.5 208.8 h147" fill="none" stroke="currentColor" stroke-width="2"/>
+</svg>
+</div>
+<p class="cmd"><code>plot --json data.columns --x name --y min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max --with box --term svg --title 'stats describe: x1 and x2' &lt; stats-describe.json</code> <a href="data/stats-describe.json">the table</a> <a href="gallery/jsonbox.svg">the svg</a></p>
+</figure>
+<figure id="boxtext">
+<h3>The same boxes as text</h3>
+<p>The whisker is <code>|</code>, the box <code>#</code>, the median <code>=</code>.</p>
+<pre>1.0 |         |                   |
+    |         |                   |
+0.8 |         |                   |
+    |################### ###################
+0.6 |################### ###################
+    |=================== ###################
+    |################### ===================
+0.4 |################### ###################
+    |################### ###################
+0.2 |         |          ###################
+    |         |                   |
+0.0 |         |                   |
+    +----------------------------------------
+              x1                  x2
+</pre>
+<p class="cmd"><code>plot --json data.columns --x name --y min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max --with box --term dumb --size 40x12 &lt; stats-describe.json</code> <a href="data/stats-describe.json">the table</a> <a href="gallery/boxtext.txt">the text</a></p>
+</figure>
 <figure id="barstext">
 <h3>Bars as text</h3>
 <p>The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.</p>
@@ -713,7 +767,7 @@ $ plot ticks 0 1000000
 </code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Not built yet: box plots, heatmaps, ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Box plots (<code>--with box</code>). Not built yet: heatmaps, ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

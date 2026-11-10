@@ -85,10 +85,14 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
         return (11, 0, none);
     }
     // a histogram (section 25) takes the column of the upper edges and nothing else of the intervals or the categories
-    if ac[4] == 2 && (len(xhi) == 0 || ke > 0 || kh > 0 || ac[7] == 1) {
+    if ac[4] == 2 && (len(xhi) == 0 || ke > 0 || ac[7] == 1) {
         return (11, 0, none);
     }
     if ac[4] != 2 && len(xhi) > 0 {
+        return (11, 0, none);
+    }
+    // a box plot (section 27) takes five columns, in the order lower, q1, median, q3, upper, and no intervals or categories (--ylo and --yhi count as intervals: kh is ke when they are given)
+    if ac[4] == 3 && (ycount != 5 || ke > 0 || ac[7] == 1) {
         return (11, 0, none);
     }
     ac[5] = ke;
@@ -204,7 +208,7 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                 line = row + 2;
                             } else {
                                 let (a, b) = csv.cell(text, at, end, xcol);
-                                if ac[4] == 1 || ac[7] == 1 {
+                                if ac[4] == 1 || ac[4] == 3 || ac[7] == 1 {
                                     // a category: its label is the cell, its place the row (section 20)
                                     xs[row] = float_of(row);
                                     cl[2 * row] = a;
@@ -247,6 +251,13 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                                     }
                                     q = q + 1;
                                 }
+                                if ac[4] == 3 && code == 0 {
+                                    // the five numbers of a box are in order (section 27)
+                                    if ys[row] > ys[n + row] || ys[n + row] > ys[2 * n + row] || ys[2 * n + row] > ys[3 * n + row] || ys[3 * n + row] > ys[4 * n + row] {
+                                        code = 7;
+                                        line = row + 2;
+                                    }
+                                }
                                 var eq = 0;
                                 while eq < ke && code == 0 {
                                     let (c, d) = csv.cell(text, at, end, ec[eq]);
@@ -287,6 +298,8 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                             let (c, d, yok) = axis.fix(ylo, yhi);
                             if !xok || !yok {
                                 code = 7;
+                            } else if ac[4] == 3 && !svg_term && w / n < 1 {
+                                code = 9;
                             } else if ac[4] == 1 && !svg_term && w / n < ycount {
                                 code = 9;
                             } else {

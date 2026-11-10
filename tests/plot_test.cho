@@ -1294,3 +1294,142 @@ fn test_xhi_without_a_histogram[&h](heap: &!h Heap) -> [heap] int {
     test.assert(code == 11);
     return 0;
 }
+
+// ---- box plots (section 27): worked out by hand --------------------------------------------------------------------------------------------------------------
+
+// the chart of a table whose x is a label and whose five y columns are lower, q1, median, q3, upper
+fn drawn_box[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: int, hh: int, svg_term: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 1);
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        ac[4] = 3;
+        let (c, l, chart) = chart.draw(heap, table, "x", ycols, "", "", "", w, hh, "", false, false, svg_term, ann, ac);
+        code = c;
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return (code, out);
+}
+
+// two boxes on 10 columns: slots of 5, boxes of 4; the whisker, the box (#) and the median (=), and no legend
+fn test_dumb_boxes[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_box(heap, "x,a,b,c,d,e\nA,1,2,3,4,5\nB,0,1,2,3,4\n", "a,b,c,d,e", 10, 6, false);
+    test.assert(code == 0);
+    same(heap, doc, "5 |  |\n4 |####   |\n3 |==== ####\n2 |#### ====\n1 |  |  ####\n0 |       |\n  +----------\n     A    B\n");
+    return 0;
+}
+
+// the same in svg: slots of 302, boxes of 151, Y(v) = 12 + 68.8 (5 - v)
+fn test_svg_boxes[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_box(heap, "x,a,b,c,d,e\nA,1,2,3,4,5\nB,0,1,2,3,4\n", "a,b,c,d,e", 640, 400, true);
+    test.assert(code == 0);
+    borrow doc as &db in {
+        let t = buffer.bytes(db);
+        test.assert(has(t, "aria-label=\"2 boxes\""));
+        test.assert(has(t, "<rect x=\"95.5\" y=\"80.8\" width=\"151\" height=\"137.6\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.35\" stroke=\"currentColor\" stroke-width=\"1\"/>\n<rect x=\"397.5\" y=\"149.6\" width=\"151\" height=\"137.6\" fill=\"var(--series-1, #0550ae)\" fill-opacity=\"0.35\" stroke=\"currentColor\" stroke-width=\"1\"/>\n"));
+        test.assert(has(t, "<path d=\"M 171 80.8 V 12 M 171 218.4 V 287.2 M 165 12 h12 M 165 287.2 h12 M 473 149.6 V 80.8 M 473 287.2 V 356 M 467 80.8 h12 M 467 356 h12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\"/>\n"));
+        test.assert(has(t, "<path d=\"M 95.5 149.6 h151 M 397.5 218.4 h151\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/>\n"));
+        test.assert(has(t, "<path d=\"M 171 356 v4\"/>\n<path d=\"M 473 356 v4\"/>\n"));
+        // a box plot has no series to name
+        test.assert(!has(t, "y=\"392\""));
+        test.assert(!has(t, "height=\"10\""));
+    }
+    buffer.drop(heap, doc);
+    return 0;
+}
+
+fn test_box_refusals[&h](heap: &!h Heap) -> [heap] int {
+    let (a, da) = drawn_box(heap, "x,a,b,c,d\nA,1,2,3,4\n", "a,b,c,d", 20, 8, false);
+    test.assert(a == 11);
+    buffer.drop(heap, da);
+    let (b, db) = drawn_box(heap, "x,a,b,c,d,e\nA,1,2,3,4,5\nB,0,3,2,3,4\n", "a,b,c,d,e", 20, 8, false);
+    test.assert(b == 7);
+    buffer.drop(heap, db);
+    let (c, dc) = drawn_box(heap, "x,a,b,c,d,e\nA,1,2,3,4,x\n", "a,b,c,d,e", 20, 8, false);
+    test.assert(c == 2);
+    buffer.drop(heap, dc);
+    // equal numbers are in order
+    let (d, dd) = drawn_box(heap, "x,a,b,c,d,e\nA,1,1,1,1,1\n", "a,b,c,d,e", 20, 8, false);
+    test.assert(d == 0);
+    buffer.drop(heap, dd);
+    // each of the four neighbours in turn
+    let (e, de) = drawn_box(heap, "x,a,b,c,d,e\nA,2,1,3,4,5\n", "a,b,c,d,e", 20, 8, false);
+    test.assert(e == 7);
+    buffer.drop(heap, de);
+    let (f, df) = drawn_box(heap, "x,a,b,c,d,e\nA,1,2,3,4,3.5\n", "a,b,c,d,e", 20, 8, false);
+    test.assert(f == 7);
+    buffer.drop(heap, df);
+    let (g, dg) = drawn_box(heap, "x,a,b,c,d,e\nA,1,4,3,5,6\n", "a,b,c,d,e", 20, 8, false);
+    test.assert(g == 7);
+    buffer.drop(heap, dg);
+    return 0;
+}
+
+// a box needs a column of its own on a text chart, and 2 pixels in svg
+fn test_box_size_edges[&h](heap: &!h Heap) -> [heap] int {
+    let t = "x,a,b,c,d,e\n1,1,2,3,4,5\n2,1,2,3,4,5\n3,1,2,3,4,5\n4,1,2,3,4,5\n5,1,2,3,4,5\n6,1,2,3,4,5\n7,1,2,3,4,5\n8,1,2,3,4,5\n9,1,2,3,4,5\n10,1,2,3,4,5\n11,1,2,3,4,5\n";
+    let (a, da) = drawn_box(heap, t, "a,b,c,d,e", 11, 6, false);
+    test.assert(a == 0);
+    buffer.drop(heap, da);
+    let (b, db) = drawn_box(heap, t, "a,b,c,d,e", 10, 6, false);
+    test.assert(b == 9);
+    buffer.drop(heap, db);
+    // 11 boxes: pw / 11 / 2 is 2 pixels at pw = 44 (width 80), and under 2 at 43
+    let (c, dc) = drawn_box(heap, t, "a,b,c,d,e", 80, 200, true);
+    test.assert(c == 0);
+    buffer.drop(heap, dc);
+    let (d, dd) = drawn_box(heap, t, "a,b,c,d,e", 79, 200, true);
+    test.assert(d == 9);
+    buffer.drop(heap, dd);
+    return 0;
+}
+
+// what stats describe prints: min, the quartiles by their place in the list, max
+fn test_json_box_fields[&h](heap: &!h Heap) -> [heap] int {
+    let (c, r, t) = csv_of(heap, "{\"data\":{\"columns\":[{\"name\":\"x1\",\"kind\":\"numeric\",\"min\":0.0,\"max\":0.992,\"quantiles\":[{\"p\":\"0.25\",\"value\":0.28},{\"p\":\"0.5\",\"value\":0.504},{\"p\":\"0.75\",\"value\":0.722}]}]}}", "data.columns", "name,min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max");
+    test.assert(c == 0);
+    same(heap, t, "name,min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max\nx1,0.0,0.28,0.504,0.722,0.992\n");
+    return 0;
+}
+
+// what the mutants of the box plots asked for: a box with intervals or categories, a median above the third quartile, a range that does not start at 0
+fn test_box_refusals_more[&h](heap: &!h Heap) -> [heap] int {
+    let (a, da) = drawn_box_with(heap, "x,a,b,c,d,e\nA,1,2,3,4,5\n", "a,b,c,d,e", "a,b,c,d,e", false);
+    test.assert(a == 11);
+    buffer.drop(heap, da);
+    let (b, db) = drawn_box_with(heap, "x,a,b,c,d,e\nA,1,2,3,4,5\n", "a,b,c,d,e", "", true);
+    test.assert(b == 11);
+    buffer.drop(heap, db);
+    let (c, dc) = drawn_box(heap, "x,a,b,c,d,e\nA,1,2,4,3,5\n", "a,b,c,d,e", 20, 8, false);
+    test.assert(c == 7);
+    buffer.drop(heap, dc);
+    return 0;
+}
+
+fn drawn_box_with[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], yerr: &static [byte], cat: bool) -> [heap] (int, buffer.Buffer) {
+    var out = buffer.empty(heap, 1);
+    var code = 99;
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](8, 0);
+        ac[4] = 3;
+        if cat {
+            ac[7] = 1;
+        }
+        let (c, l, chart) = chart.draw(heap, table, "x", ycols, yerr, "", "", 20, 8, "", false, false, false, ann, ac);
+        code = c;
+        buffer.drop(heap, out);
+        out = chart;
+    }
+    return (code, out);
+}
+
+// a box that stays well above 0: the y axis starts under its lower whisker, not at 0
+fn test_dumb_box_far_from_zero[&h](heap: &!h Heap) -> [heap] int {
+    let (code, doc) = drawn_box(heap, "x,a,b,c,d,e\nA,2,3,4,5,6\n", "a,b,c,d,e", 6, 5, false);
+    test.assert(code == 0);
+    same(heap, doc, "6 |  |\n5 |#####\n4 |=====\n3 |#####\n2 |  |\n  +------\n      A\n");
+    return 0;
+}

@@ -284,8 +284,11 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
                 } else if bytes.equal(value, "hist") {
                     lines = false;
                     ac[4] = 2;
+                } else if bytes.equal(value, "box") {
+                    lines = false;
+                    ac[4] = 3;
                 } else {
-                    return refuse(io, "plot.usage", "--with takes points, lines, bars or hist", "--with bars");
+                    return refuse(io, "plot.usage", "--with takes points, lines, bars, hist or box", "--with bars");
                 }
             } else if bytes.equal(flag, "--size") {
                 let (a, b) = size_of(value);
@@ -394,7 +397,7 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
             } else if code == 7 {
                 status = refuse(io, "plot.range-invalid", "a range is beyond 1e15 of zero, narrower than 1e-12, or 1e12 times narrower than its distance from zero", "plot the difference from a base value");
             } else if code == 11 {
-                status = refuse(io, "plot.usage", "--yerr, or --ylo with --yhi, needs one column for each series; --with hist needs --xhi and no intervals or categories, and --xhi only goes with hist", "--yerr e1,e2 for --y a,b; --with hist --x lo --xhi hi --y count");
+                status = refuse(io, "plot.usage", "--yerr, or --ylo with --yhi, needs one column for each series; --with hist needs --xhi and no intervals or categories, and --xhi only goes with hist; --with box needs five --y columns (lower, q1, median, q3, upper) and no intervals or categories", "--yerr e1,e2 for --y a,b; --with hist --x lo --xhi hi --y count");
             } else if code == 8 {
                 status = refuse(io, "plot.too-many-series", "more than 5 series", "plot at most 5 columns");
             } else if code == 9 {

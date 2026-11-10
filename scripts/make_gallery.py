@@ -95,6 +95,12 @@ GALLERY = [
     ("histtext", "The same histogram as text",
      "A bin three columns wide or more leaves its last column empty, so neighbours can be told apart.",
      "stats-describe.json", ["--json", "data.columns.0.histogram", "--x", "lo", "--xhi", "hi", "--y", "count", "--with", "hist", "--term", "dumb", "--size", "60x10"], "txt"),
+    ("jsonbox", "Box plots from stats describe",
+     "The same document: <code>min</code>, the three quantiles asked for (<code>quantiles.0.value</code> to <code>quantiles.2.value</code>, dotted paths with an index) and <code>max</code> are the five numbers of a box for each column. A box plot takes exactly five <code>--y</code> columns, in that order.",
+     "stats-describe.json", ["--json", "data.columns", "--x", "name", "--y", "min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max", "--with", "box", "--term", "svg", "--title", "stats describe: x1 and x2"], "svg"),
+    ("boxtext", "The same boxes as text",
+     "The whisker is <code>|</code>, the box <code>#</code>, the median <code>=</code>.",
+     "stats-describe.json", ["--json", "data.columns", "--x", "name", "--y", "min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max", "--with", "box", "--term", "dumb", "--size", "40x12"], "txt"),
     ("barstext", "Bars as text",
      "The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.",
      "importance.csv", ["--x", "feature", "--y", "importance", "--with", "bars", "--yerr", "std", "--term", "dumb", "--size", "56x12"], "txt"),
@@ -209,7 +215,7 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 <pre><code>@TICKS@</code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Not built yet: box plots, heatmaps, ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Box plots (<code>--with box</code>). Not built yet: heatmaps, ROC and other curves, <code>--logy</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

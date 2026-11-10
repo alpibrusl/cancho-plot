@@ -402,3 +402,15 @@ then one path of the whiskers and caps, `M cx Y(q3) V Y(upper) M cx Y(q1) V Y(lo
 A box narrower than 2 pixels is `plot.size-invalid`.
 
 **Gate.** `cancho test`: hand-worked charts in both terminals, the order refusals, the count refusal, the JSON path with indexes on a real `stats describe` document; the mutant measurement as in sections 18, 24 and 26.
+
+## 28. Slice 5d-1, built [measured]
+
+`--with box` as section 27 says, in both terminals; the category axis of bars is reused (`ac[4] == 3` counts as a category chart), the y range is the five columns' own (it does not start at 0), and no legend is written. **No Python added.**
+The real document: `stats describe --bins 10 --quantiles 0.25,0.5,0.75 --cols x1,x2` (`site/data/stats-describe.json`), drawn by the gallery as svg and as text with `--json data.columns --x name --y min,quantiles.0.value,quantiles.1.value,quantiles.2.value,max`.
+
+**Tests and measure.** 71 + 21 `cancho test` cases now. The box ones are worked out by hand: two boxes in text (the whisker, the `#` box, the `=` median, no legend line) and in svg with their numbers (`Y(v) = 12 + 68.8 (5 - v)`; rects at 95.5 and 397.5, whisker and median paths), a box far from 0, every
+order refusal (each neighbouring pair of the five numbers in turn, equal numbers allowed), the count, intervals and categories refused, the size edges (a column for each box in text; 2 pixels in svg: 80 wide takes 11 boxes, 79 does not), and the JSON path with indexes (`quantiles.0.value`) on the shape of the real document.
+Writing them found one thing in the program: the text chart printed an empty line where the legend would have been (the test said no line; the program is fixed). Mutants of the box code against the tests alone: 37 first; the first tests killed 31; with a test for each survivor and two checks removed as dead code
+(`kh > 0` in the refusal, which `ke > 0` and the checks before it already cover, here and in the histogram's; and the legend count in `dumb`, made redundant by dropping the line), every mutant that still applies is killed: 32 of 32 in the main run and the 5 for the rewritten refusals.
+
+**Not yet:** heatmaps, the curves computed by `plot` (ROC, empirical CDF, Q-Q), `--logy`, `--by`, horizontal bars.

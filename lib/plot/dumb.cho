@@ -234,6 +234,35 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
                 }
                 j = j + 1;
             }
+        } else if ac[4] == 3 {
+            // box plots (section 27): the whisker, then the box, then the median, the five columns of ys being lower, q1, median, q3, upper
+            var bi = 0;
+            while bi < n {
+                let (gs, bw) = slot(w, n, 1, bi);
+                var ra = rowcell(ys[4 * n + bi], ylo2, yhi2, hh);
+                let rb = rowcell(ys[bi], ylo2, yhi2, hh);
+                while ra <= rb {
+                    grid[ra * w + gs + bw / 2] = byte_of('|');
+                    ra = ra + 1;
+                }
+                var r3 = rowcell(ys[3 * n + bi], ylo2, yhi2, hh);
+                let r1 = rowcell(ys[n + bi], ylo2, yhi2, hh);
+                while r3 <= r1 {
+                    var cc = gs;
+                    while cc < gs + bw {
+                        grid[r3 * w + cc] = byte_of('#');
+                        cc = cc + 1;
+                    }
+                    r3 = r3 + 1;
+                }
+                let rm = rowcell(ys[2 * n + bi], ylo2, yhi2, hh);
+                var cm = gs;
+                while cm < gs + bw {
+                    grid[rm * w + cm] = byte_of('=');
+                    cm = cm + 1;
+                }
+                bi = bi + 1;
+            }
         } else if ac[4] == 1 {
             // bars (section 20): from the row of 0 to the row of the value, the rows of both included
             let rz = rowcell(0.0, ylo2, yhi2, hh);
@@ -399,7 +428,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         // the labels of the x axis
         let xl = alloc_slice[r](w, byte_of(' '));
         var prev_end = 0 - 2;
-        if ac[4] == 1 || ac[7] == 1 {
+        if ac[4] == 1 || ac[4] == 3 || ac[7] == 1 {
             // the label of a category, cut to 10 bytes, centred on its slot (section 20)
             var ci = 0;
             while ci < n {
@@ -428,7 +457,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
             }
         }
         var q = xk0;
-        if ac[4] == 1 || ac[7] == 1 {
+        if ac[4] == 1 || ac[4] == 3 || ac[7] == 1 {
             q = xk1 + 1;
         }
         while q <= xk1 {
@@ -458,7 +487,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         line = spaces(heap, buffer.empty(heap, 64), g + 2);
         line = buffer.append(heap, line, xl[0..w]);
         out = flush(heap, out, line);
-        // the legend
+        // the legend (a box plot has none)
         line = buffer.empty(heap, 64);
         j = 0;
         while j < k {
@@ -470,7 +499,11 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
             line = buffer.append(heap, line, text[ns[j]..ne[j]]);
             j = j + 1;
         }
-        out = flush(heap, out, line);
+        if ac[4] == 3 {
+            buffer.drop(heap, line);
+        } else {
+            out = flush(heap, out, line);
+        }
     }
     return out;
 }
