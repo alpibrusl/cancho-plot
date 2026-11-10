@@ -9,10 +9,10 @@ mkdir -p build
 "$CANCHO" check lib/plot/*.cho tools/plot/main.cho --std
 "$CANCHO" build --bin plot >/dev/null
 "$CANCHO" fmt --check lib tools tests
-for f in lib/plot/*.cho tools/plot/main.cho tests/plot_test.cho tests/plot_cases_test.cho tests/plot_curve_test.cho; do
+for f in lib/plot/*.cho tools/plot/main.cho tests/plot_test.cho tests/plot_cases_test.cho tests/plot_curve_test.cho tests/plot_log_test.cho; do
   [ "$(wc -l < "$f")" -le 2000 ] || { echo "FAIL: $f is over 2000 lines" >&2; exit 1; }
 done
-for t in tests/plot_test.cho tests/plot_cases_test.cho tests/plot_curve_test.cho; do
+for t in tests/plot_test.cho tests/plot_cases_test.cho tests/plot_curve_test.cho tests/plot_log_test.cho; do
   "$CANCHO" test lib/plot/*.cho "$t" --std
 done
 export PLOT="$here/build/plot"

@@ -130,7 +130,7 @@ fn line_chart[&h, &a, &c](heap: &!h Heap, w: int, hh: int, two: bool, title: &st
 fn test_dumb_one_series[&h](heap: &!h Heap) -> [heap] int {
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         same(heap, line_chart(heap, 10, 5, false, "", false, false, ann, ac), "2.0 |         *\n1.5 |\n1.0 |     *\n0.5 |\n0.0 |*\n    +----------\n     0.0 1.0\n* y1\n");
     }
     return 0;
@@ -139,7 +139,7 @@ fn test_dumb_one_series[&h](heap: &!h Heap) -> [heap] int {
 fn test_dumb_two_series_and_title[&h](heap: &!h Heap) -> [heap] int {
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         same(heap, line_chart(heap, 10, 5, true, "T", true, false, ann, ac), "         T\n2.0 |+        *\n1.5 |\n1.0 |     +\n0.5 |\n0.0 |*        +\n    +----------\n     0.0 1.0\n* y1  + y2\n");
     }
     return 0;
@@ -149,7 +149,7 @@ fn test_dumb_two_series_and_title[&h](heap: &!h Heap) -> [heap] int {
 fn test_dumb_annotations[&h](heap: &!h Heap) -> [heap] int {
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ann[0] = 1.0;
         ann[8] = 0.5;
         ann[16] = 1.0;
@@ -172,7 +172,7 @@ fn test_dumb_lines[&h](heap: &!h Heap) -> [heap] int {
         let ne = alloc_slice[r](5, 0);
         let cs = alloc_slice[r](2, 0);
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         xs[1] = 1.0;
         xs[2] = 2.0;
         xs[3] = 3.0;
@@ -197,7 +197,7 @@ fn test_svg_lines[&h](heap: &!h Heap) -> [heap] int {
         let ne = alloc_slice[r](5, 0);
         let cs = alloc_slice[r](2, 0);
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         xs[1] = 1.0;
         xs[2] = 2.0;
         ys[1] = 1.0;
@@ -237,7 +237,7 @@ fn test_svg_annotations[&h](heap: &!h Heap) -> [heap] int {
         let ne = alloc_slice[r](5, 0);
         let cs = alloc_slice[r](2, 0);
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         xs[1] = 1.0;
         xs[2] = 2.0;
         ys[1] = 1.0;
@@ -280,7 +280,7 @@ fn test_svg_title_and_size[&h](heap: &!h Heap) -> [heap] int {
         let ne = alloc_slice[r](5, 0);
         let cs = alloc_slice[r](2, 0);
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         xs[1] = 1.0;
         ys[1] = 1.0;
         ns[0] = 2;
@@ -314,7 +314,7 @@ fn code_of[&h, &t](heap: &!h Heap, text: &t [byte], xspec: &static [byte], yspec
     var line = 0;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         let (c, l, out) = chart.draw(heap, text, xspec, yspec, "", "", "", 20, 8, title, has_title, false, false, ann, ac);
         buffer.drop(heap, out);
         code = c;
@@ -395,7 +395,7 @@ fn code_of_buffer[&h](heap: &!h Heap, text: buffer.Buffer, ycols: &static [byte]
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         borrow text as &tb in {
             let (c, l, out) = chart.draw(heap, buffer.bytes(tb), "x", ycols, "", "", "", 20, 8, "", false, false, false, ann, ac);
             buffer.drop(heap, out);
@@ -431,7 +431,7 @@ fn title_code[&h](heap: &!h Heap, middle: int) -> [heap] int {
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         borrow title as &tb in {
             let (c, l, out) = chart.draw(heap, "x,y\n1,2\n3,4\n", "x", "y", "", "", "", 20, 8, buffer.bytes(tb), true, false, false, ann, ac);
             buffer.drop(heap, out);
@@ -460,7 +460,7 @@ fn svg_of[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w: in
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         let (c, l, chart) = chart.draw(heap, table, "x", ycols, "", "", "", w, hh, title, has_title, lines, true, ann, ac);
         code = c;
         buffer.drop(heap, out);
@@ -556,7 +556,7 @@ fn svg_diag[&h, &t](heap: &!h Heap, table: &t [byte]) -> [heap] buffer.Buffer {
     var out = buffer.empty(heap, 1);
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[3] = 1;
         let (c, l, chart) = chart.draw(heap, table, "x", "y", "", "", "", 640, 400, "", false, false, true, ann, ac);
         test.assert(c == 0);
@@ -605,7 +605,7 @@ fn drawn[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], yerr: 
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         if bars {
             ac[4] = 1;
         }
@@ -815,7 +815,7 @@ fn drawn_ext[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], yl
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         if bars {
             ac[4] = 1;
         }
@@ -1074,7 +1074,7 @@ fn test_yhi_alone[&h](heap: &!h Heap) -> [heap] int {
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         let (c, l, chart) = chart.draw(heap, "x,y,h\n0,1,2\n", "x", "y", "", "h", "", 20, 8, "", false, false, false, ann, ac);
         code = c;
         buffer.drop(heap, chart);
@@ -1089,7 +1089,7 @@ fn drawn_cat[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], ye
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[7] = 1;
         let (c, l, chart) = chart.draw(heap, table, "x", ycols, yerr, "", "", w, hh, "", false, lines, false, ann, ac);
         code = c;
@@ -1121,7 +1121,7 @@ fn drawn_hist[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], x
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[4] = 2;
         if cat {
             ac[7] = 1;
@@ -1206,7 +1206,7 @@ fn test_histogram_refusals[&h](heap: &!h Heap) -> [heap] int {
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         let (g, l, chart) = chart.draw(heap, t, "lo", "c", "", "", "hi", 20, 8, "", false, false, false, ann, ac);
         code = g;
         buffer.drop(heap, chart);
@@ -1286,7 +1286,7 @@ fn test_xhi_without_a_histogram[&h](heap: &!h Heap) -> [heap] int {
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         let (g, l, chart) = chart.draw(heap, "lo,h,c\n0,1,2\n", "lo", "c", "", "", "h", 20, 8, "", false, false, false, ann, ac);
         code = g;
         buffer.drop(heap, chart);
@@ -1303,7 +1303,7 @@ fn drawn_box[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], w:
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[4] = 3;
         let (c, l, chart) = chart.draw(heap, table, "x", ycols, "", "", "", w, hh, "", false, false, svg_term, ann, ac);
         code = c;
@@ -1413,7 +1413,7 @@ fn drawn_box_with[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[4] = 3;
         if cat {
             ac[7] = 1;
@@ -1442,7 +1442,7 @@ fn drawn_heat[&h, &t](heap: &!h Heap, table: &t [byte], ycol: &static [byte], z:
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[4] = 4;
         if cat {
             ac[7] = 1;
@@ -1572,7 +1572,7 @@ fn drawn_heat_titled[&h, &t](heap: &!h Heap, table: &t [byte], w: int, hh: int, 
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[4] = 4;
         let (c, l, chart) = chart.draw(heap, table, "a", "b", "", "", "v", w, hh, "T", true, false, svg_term, ann, ac);
         code = c;
@@ -1655,7 +1655,7 @@ fn test_heatmap_fifty_categories[&h](heap: &!h Heap) -> [heap] int {
         var code = 99;
         region r {
             let ann = alloc_slice[r](24, 0.0);
-            let ac = alloc_slice[r](8, 0);
+            let ac = alloc_slice[r](9, 0);
             ac[4] = 4;
             let (c, l, chart) = chart.draw(heap, buffer.bytes(a), "a", "b", "", "", "v", 100, 6, "", false, false, false, ann, ac);
             code = c;
@@ -1669,7 +1669,7 @@ fn test_heatmap_fifty_categories[&h](heap: &!h Heap) -> [heap] int {
         var code = 99;
         region r {
             let ann = alloc_slice[r](24, 0.0);
-            let ac = alloc_slice[r](8, 0);
+            let ac = alloc_slice[r](9, 0);
             ac[4] = 4;
             let (c, l, chart) = chart.draw(heap, buffer.bytes(b), "a", "b", "", "", "v", 100, 6, "", false, false, false, ann, ac);
             code = c;
@@ -1728,7 +1728,7 @@ fn test_heatmap_intervals_refused[&h](heap: &!h Heap) -> [heap] int {
     var code = 99;
     region r {
         let ann = alloc_slice[r](24, 0.0);
-        let ac = alloc_slice[r](8, 0);
+        let ac = alloc_slice[r](9, 0);
         ac[4] = 4;
         let (c, l, chart) = chart.draw(heap, "a,b,v\nx,p,1\n", "a", "b", "v", "", "v", 20, 6, "", false, false, false, ann, ac);
         code = c;
@@ -1757,7 +1757,7 @@ fn test_heatmap_fifty_rows[&h](heap: &!h Heap) -> [heap] int {
         var code = 99;
         region r {
             let ann = alloc_slice[r](24, 0.0);
-            let ac = alloc_slice[r](8, 0);
+            let ac = alloc_slice[r](9, 0);
             ac[4] = 4;
             let (c, l, chart) = chart.draw(heap, buffer.bytes(a), "a", "b", "", "", "v", 40, 100, "", false, false, false, ann, ac);
             code = c;
@@ -1771,7 +1771,7 @@ fn test_heatmap_fifty_rows[&h](heap: &!h Heap) -> [heap] int {
         var code = 99;
         region r {
             let ann = alloc_slice[r](24, 0.0);
-            let ac = alloc_slice[r](8, 0);
+            let ac = alloc_slice[r](9, 0);
             ac[4] = 4;
             let (c, l, chart) = chart.draw(heap, buffer.bytes(b), "a", "b", "", "", "v", 40, 100, "", false, false, false, ann, ac);
             code = c;

@@ -36,8 +36,15 @@ pub fn fix(lo0: float, hi0: float) -> [] (float, float, bool) {
 }
 
 // the widened range and its ticks: (lo, hi, m, e, first, last)
-pub fn axis(lo: float, hi: float, n: int) -> [] (float, float, int, int, int, int) {
-    let (m, e) = ticks.step(hi - lo, n);
+pub fn axis(lo: float, hi: float, n: int, lg: bool) -> [] (float, float, int, int, int, int) {
+    let (m0, e0) = ticks.step(hi - lo, n);
+    // a log axis has its ticks at whole exponents (section 33)
+    var m = m0;
+    var e = e0;
+    if lg && e0 < 0 {
+        m = 1;
+        e = 0;
+    }
     let (k0, k1) = ticks.enclose(lo, hi, m, e);
     return (ticks.value(k0, m, e), ticks.value(k1, m, e), m, e, k0, k1);
 }
@@ -137,5 +144,29 @@ pub fn extent[&a, &b, &c, &d](xs: &a [float], ys: &b [float], n: int, k: int, an
         }
         j = j + 1;
     }
+    // a log axis runs between whole exponents, one decade at least (section 33)
+    if ac[8] == 1 {
+        var a = truncate(ylo);
+        if float_of(a) > ylo {
+            a = a - 1;
+        }
+        var b = truncate(yhi);
+        if float_of(b) < yhi {
+            b = b + 1;
+        }
+        if b == a {
+            b = a + 1;
+        }
+        ylo = float_of(a);
+        yhi = float_of(b);
+    }
     return (xlo, xhi, ylo, yhi);
+}
+
+// the label of a y tick: the number, or the power of ten it stands for on a log axis
+pub fn label_y[&h, &c](heap: &!h Heap, out: buffer.Buffer, k: int, m: int, e: int, ac: &c [int]) -> [heap] buffer.Buffer {
+    if ac[8] == 1 {
+        return ticks.label_log(heap, out, k, m, e);
+    }
+    return ticks.label(heap, out, k, m, e);
 }

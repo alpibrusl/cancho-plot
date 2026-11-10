@@ -9,6 +9,7 @@ import plot.heat;
 import plot.num;
 import plot.svg;
 import std.buffer;
+import std.math;
 
 // A table in memory in, a chart out (docs/design.md sections 11 and 13). The codes `draw` answers with: 0 done; 1 a double quote; 2 a cell that is not a number; 3 a line with the wrong number of cells;
 // 4 no rows; 5 a column that is not there; 6 more than 5,000 rows; 7 a range the ticks cannot stand for; 8 more than 5 series; 9 a plot area under 20 (svg); 10 a control byte in the title or a name.
@@ -43,7 +44,7 @@ fn has_control[&t](text: &t [byte]) -> [] bool {
 }
 
 // Read the table in `text` and draw it: x from the column `xspec`, the series from the columns of the comma-separated `yspec`. Answers (code, line, chart): `line` is the line of the table the code is about (from 1).
-pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], yerr: &q [byte], yhi: &q2 [byte], xhi: &q3 [byte], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, svg_term: bool, ann: &e [float], ac: &!f [int]) -> [heap] (int, int, buffer.Buffer) {
+pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [byte], xspec: &x [byte], yspec: &y [byte], yerr: &q [byte], yhi: &q2 [byte], xhi: &q3 [byte], w: int, hh: int, title: &z [byte], has_title: bool, lines: bool, svg_term: bool, ann: &!e [float], ac: &!f [int]) -> [heap] (int, int, buffer.Buffer) {
     let none = buffer.empty(heap, 1);
     if len(text) == 0 {
         return (4, 0, none);
@@ -113,6 +114,10 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
     }
     // a box plot (section 27) takes five columns, in the order lower, q1, median, q3, upper, and no intervals or categories (--ylo and --yhi count as intervals: kh is ke when they are given)
     if ac[4] == 3 && (ycount != 5 || ke > 0 || ac[7] == 1) {
+        return (11, 0, none);
+    }
+    // a log axis (section 33) is for points and lines, with no intervals and no diagonal
+    if ac[8] == 1 && (ac[4] != 0 || ke > 0 || ac[3] == 1) {
         return (11, 0, none);
     }
     ac[5] = ke;
@@ -323,6 +328,37 @@ pub fn draw[&h, &t, &x, &y, &q, &q2, &q3, &z, &e, &f](heap: &!h Heap, text: &t [
                             }
                             at = csv.next_line(text, end);
                             row = row + 1;
+                        }
+                        if code == 0 && ac[8] == 1 {
+                            // the values and the markers by their log10; one that is not above 0 has none (section 33)
+                            var q = 0;
+                            while q < ycount * n && code == 0 {
+                                if ys[q] > 0.0 {
+                                    ys[q] = math.log10(ys[q]);
+                                } else {
+                                    code = 19;
+                                    line = q % n + 2;
+                                }
+                                q = q + 1;
+                            }
+                            q = 0;
+                            while q < ac[1] && code == 0 {
+                                if ann[8 + q] > 0.0 {
+                                    ann[8 + q] = math.log10(ann[8 + q]);
+                                } else {
+                                    code = 19;
+                                }
+                                q = q + 1;
+                            }
+                            q = 0;
+                            while q < 2 * ac[2] && code == 0 {
+                                if ann[16 + q] > 0.0 {
+                                    ann[16 + q] = math.log10(ann[16 + q]);
+                                } else {
+                                    code = 19;
+                                }
+                                q = q + 1;
+                            }
                         }
                         if code == 0 && ac[4] == 4 {
                             // the categories of a heatmap, numbered by first appearance, and the cells given twice (section 29)

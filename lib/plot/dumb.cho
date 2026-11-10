@@ -118,8 +118,8 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
     var i = 0;
     let (xl0, xh0, xok) = axis.fix(xlo, xhi);
     let (yl0, yh0, yok) = axis.fix(ylo, yhi);
-    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6);
-    let (ylo2, yhi2, ym, ye, yk0, yk1) = axis.axis(yl0, yh0, 5);
+    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6, false);
+    let (ylo2, yhi2, ym, ye, yk0, yk1) = axis.axis(yl0, yh0, 5, ac[8] == 1);
     var out = buffer.empty(heap, 4096);
     region r {
         let grid = alloc_slice[r](w * hh, byte_of(' '));
@@ -351,7 +351,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         while t < nt {
             let (yl1, before) = axis.used(yl);
             yoff[t] = before;
-            let yl2 = ticks.label(heap, yl1, yk0 + t, ym, ye);
+            let yl2 = axis.label_y(heap, yl1, yk0 + t, ym, ye, ac);
             let (yl3, after) = axis.used(yl2);
             yl = yl3;
             yrow[t] = rowcell(ticks.value(yk0 + t, ym, ye), ylo2, yhi2, hh);

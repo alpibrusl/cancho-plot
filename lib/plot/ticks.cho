@@ -155,3 +155,38 @@ pub fn enclose(lo: float, hi: float, m: int, e: int) -> [] (int, int) {
     }
     return (first, last);
 }
+
+// the tick of a log axis: the exponent x = k * m * 10^e (e at least 0) written as the number 10^x (section 33): digits from 1 to 1000000, a decimal from 0.1 to 0.000001, else 1e<x>
+pub fn label_log[&h](heap: &!h Heap, out: buffer.Buffer, k: int, m: int, e: int) -> [heap] buffer.Buffer {
+    var b = out;
+    var x = k * m;
+    var z = 0;
+    while z < e {
+        x = x * 10;
+        z = z + 1;
+    }
+    if x >= 0 && x <= 6 {
+        b = buffer.push(heap, b, byte_of('1'));
+        z = 0;
+        while z < x {
+            b = buffer.push(heap, b, byte_of('0'));
+            z = z + 1;
+        }
+        return b;
+    }
+    if x < 0 && x >= 0 - 6 {
+        b = buffer.append(heap, b, "0.");
+        z = 0;
+        while z < 0 - x - 1 {
+            b = buffer.push(heap, b, byte_of('0'));
+            z = z + 1;
+        }
+        return buffer.push(heap, b, byte_of('1'));
+    }
+    b = buffer.append(heap, b, "1e");
+    if x < 0 {
+        b = buffer.push(heap, b, byte_of('-'));
+        x = 0 - x;
+    }
+    return buffer.push_nat(heap, b, x);
+}

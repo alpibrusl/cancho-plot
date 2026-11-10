@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" width="520" height="320" role="img" aria-label="Objective by iteration: 2 series, 7 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 76 36 V 276 H 504"/>
+<path d="M 76 276 h-4"/>
+<path d="M 76 228 h-4"/>
+<path d="M 76 180 h-4"/>
+<path d="M 76 132 h-4"/>
+<path d="M 76 84 h-4"/>
+<path d="M 76 36 h-4"/>
+<path d="M 76 276 v4"/>
+<path d="M 147.33 276 v4"/>
+<path d="M 218.67 276 v4"/>
+<path d="M 290 276 v4"/>
+<path d="M 361.33 276 v4"/>
+<path d="M 432.67 276 v4"/>
+<path d="M 504 276 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="260" y="20" text-anchor="middle" font-size="14">Objective by iteration</text>
+<text x="68" y="280" text-anchor="end">0.000001</text>
+<text x="68" y="232" text-anchor="end">0.0001</text>
+<text x="68" y="184" text-anchor="end">0.01</text>
+<text x="68" y="136" text-anchor="end">1</text>
+<text x="68" y="88" text-anchor="end">100</text>
+<text x="68" y="40" text-anchor="end">10000</text>
+<text x="76" y="294" text-anchor="middle">0</text>
+<text x="147.33" y="294" text-anchor="middle">1</text>
+<text x="218.67" y="294" text-anchor="middle">2</text>
+<text x="290" y="294" text-anchor="middle">3</text>
+<text x="361.33" y="294" text-anchor="middle">4</text>
+<text x="432.67" y="294" text-anchor="middle">5</text>
+<text x="504" y="294" text-anchor="middle">6</text>
+<text x="90" y="312">gradient</text>
+<text x="240" y="312">newton</text>
+</g>
+<path d="M 76 82.1 L 147.33 91.65 L 218.67 101.31 L 290 110.72 L 361.33 120.21 L 432.67 130.1 L 504 139.22" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M 76 82.1 L 147.33 104.49 L 218.67 129.27 L 290 157.1 L 361.33 189.55 L 432.67 220.78 L 504 252" fill="none" stroke="var(--series-2, #bc4c00)" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="76" y="303" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+<rect x="226" y="303" width="10" height="10" fill="var(--series-2, #bc4c00)"/>
+</svg>

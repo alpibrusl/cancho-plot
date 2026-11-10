@@ -481,3 +481,34 @@ A first run killed 34 of 41; the seven that lived were real gaps, and tests were
 **Not measured:** the ROC area against `ml`'s `roc_auc` (the `ml` binary is not built in this checkout; the pair count is the definition, worked by hand).
 
 **Gallery.** `roc`, `ecdf` and `qq` draw `site/data/scores.csv` (20 hand-written example rows, said to be so on the page, not the output of a model).
+
+## 33. Slice 5f: `--logy` and `--by` [choice, before the code]
+
+**`--logy`.** The y axis in log10. For lines and points only: with `--with bars|hist|box|heat`, error bars (`--yerr`, `--ylo`), or `--diag`, a usage refusal (`plot.usage`, code 11): a bar's base at zero has no place on a log axis, and the diagonal y = x is not straight on it. Every plotted y value, and every `--hline` and `--band` value, must be above 0, else `plot.log-nonpositive` with the line of the first offending row (0 for a marker). The values are replaced by their log10 before anything else, so the data, the markers and the bands all go through the one transform.
+
+*Range and ticks.* The range is widened to whole exponents (floor of the low, ceil of the high; one decade when they are equal), and the ticks are at whole exponents, with the step 1, 2 or 5 decades that section 10 picks for the span (never a fraction of a decade: a step below 1 is made 1). A tick at the exponent x is labelled with the number 10^x: digits for 1 to 1000000 (`1`, `10`, `1000000`), `0.1` to `0.000001`, and `1e7`, `1e-7` beyond. Claim to measure: the tick labels of a table that spans 1 to 1000 are `1 10 100 1000` and the point at 100 is at the same height as the tick `100`.
+
+**`--by COL`.** One series for each value of the column COL (text, the same cell rules as categories: no quote, no comma, no control byte), taken from a long table. Series share the x column in this program, so a group must give the same x values as the first group, in the same order: the first group's rows set the x values; any other group with another count, or another x at the same position, is `plot.by-misaligned` with the line of the first row that differs. At most 5 groups (`plot.too-many-series`), named by their text in order of first appearance. `--y` takes one column; `--by` is not combined with `--curve`, intervals, or `bars|hist|box|heat`. `--json` composes (the by field is read with the others). Not in this slice: groups with different x values (it needs a per-series x in the drawing code).
+
+**Gate.** `cancho test`: hand-worked charts with `--logy` in both terminals (the axis of 1 to 1000, a single decade, a half-decade range widened to whole exponents), every refusal; `--by` pivots by hand, every refusal; mutants as before.
+
+## 34. Slice 5f, built [measured]
+
+`--logy` and `--by COL` are built as section 33 says: the log transform is in `chart.cho` (before the ranges), the whole-exponent ticks and widening in `axis.cho`, the power-of-ten labels in `ticks.cho` (`label_log`), the pivot in `lib/plot/by.cho`. `tests/plot_log_test.cho` has 12 `cancho test` cases (85 + 21 + 15 + 12 in the four files).
+
+**Measured.** The claim of section 33 holds: for a table of 1, 10, 100, 1000 the y labels are `1 10 100 1000`, and in the text chart the point at 100 and the `--hline 10` marker lie on the rows of their ticks; in the svg the labels are at y = 360, 245.33, 130.67 and 16 for a plot area from 12 to 356 (three equal decades of 114.67). A band from 10 to 100 fills the rows from the tick 100 down to the tick 10.
+
+**Found while writing the tests, not changed:** the widening of the range to whole exponents in `axis.extent` only matters when all the values are equal (a single decade, 10 to 100, and not 1 to 100): for any other range, `enclose` with a step of whole exponents gives the same axis. It is kept because the single-decade rule is the stated one and has its test.
+
+**Mutants.** 52 single-line mutants of the new code (`label_log`, the log part of `axis.cho`, the transform and refusal in `chart.cho`, all of `by.cho`): 48 killed, 4 survive, all equivalent:
+
+- `x < 0 && x >= -6` to `x <= 0 && ...` in `label_log`: x = 0 is answered by the branch before.
+- `ac[8] == 1` to `ac[8] != 0` in `extent`: `ac[8]` is 0 or 1.
+- `if b == a` to `b <= a`: `b` is never below `a` there.
+- `seen[g1] != m` to `seen[g1] < m`: a group with more rows than the first is refused in the pass before, so only fewer are left.
+
+The first run killed 35 of 52; the 13 real gaps (a second series; either end of a band, and the transform of a band; the single decade; the row limit of `--by` on both sides; a missing x or y column; a row too many whose x is 0) each have a test now. Not measured: `--logy` against a plot of the same data made in another tool.
+
+**Gallery.** `logby`: two runs on a log axis, from `site/data/converge.csv` (a small hand-written example of two solvers, said so on the page; not a measurement of any solver).
+
+**Still open:** `--by` with groups that have different x values (needs a per-series x in the drawing code), horizontal bars, a staircase ECDF, and the trace of `opt` (section 22) once `opt` prints it.

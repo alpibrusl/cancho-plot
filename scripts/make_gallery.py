@@ -52,7 +52,8 @@ def datasets():
     folds = "fold,roc_auc,accuracy,f1\n1,0.914,0.800,0.810\n2,0.963,0.907,0.921\n3,0.947,0.853,0.874\n4,0.942,0.867,0.872\n"
     forest = "test,difference,half\nx1,-0.057,0.062\nx2,0.012,0.041\nx3,0.104,0.055\nx4,-0.021,0.030\n"
     scores = "label,score\n" + "".join("%d,%s\n" % (l, s) for l, s in [(0, "0.08"), (0, "0.12"), (0, "0.18"), (0, "0.22"), (0, "0.31"), (0, "0.35"), (0, "0.41"), (0, "0.47"), (0, "0.52"), (0, "0.66"), (1, "0.30"), (1, "0.45"), (1, "0.55"), (1, "0.58"), (1, "0.62"), (1, "0.71"), (1, "0.77"), (1, "0.83"), (1, "0.9"), (1, "0.95")])
-    return {"net.csv": "\n".join(net) + "\n", "calibration.csv": "\n".join(cal) + "\n", "estimate.csv": "\n".join(est) + "\n", "five.csv": "\n".join(five) + "\n", "importance.csv": imp, "folds.csv": folds, "forest.csv": forest, "scores.csv": scores}
+    converge = "iteration,solver,fun\n" + "".join("%d,%s,%s\n" % (i, s, v) for s, vs in [("gradient", ["120", "48", "19", "7.7", "3.1", "1.2", "0.5"]), ("newton", ["120", "14", "1.3", "0.09", "0.004", "0.0002", "0.00001"])] for i, v in enumerate(vs))
+    return {"net.csv": "\n".join(net) + "\n", "calibration.csv": "\n".join(cal) + "\n", "estimate.csv": "\n".join(est) + "\n", "five.csv": "\n".join(five) + "\n", "importance.csv": imp, "folds.csv": folds, "forest.csv": forest, "scores.csv": scores, "converge.csv": converge}
 
 
 # (id, title, text under it, data file, arguments, output kind)
@@ -117,6 +118,9 @@ GALLERY = [
     ("qq", "A normal Q-Q plot as text",
      "<code>--curve qq --x score</code>: the sorted values against the standard normal quantiles at (i + 0.5) / n. A straight line means the values look normal.",
      "scores.csv", ["--curve", "qq", "--x", "score", "--term", "dumb", "--size", "50x14"], "txt"),
+    ("logby", "Two runs on a log axis",
+     "<code>--by solver</code> makes one series for each value of the column (both runs give the same iterations), and <code>--logy</code> puts the objective on a log axis whose ticks are the powers of ten. The numbers are a small hand-written example of two solvers, not a measurement.",
+     "converge.csv", ["--x", "iteration", "--y", "fun", "--by", "solver", "--with", "lines", "--logy", "--term", "svg", "--size", "520x320", "--title", "Objective by iteration"], "svg"),
     ("barstext", "Bars as text",
      "The same importance chart with <code>--term dumb</code>: each category's slot is shared by its bars, and the whisker is a <code>|</code> at the middle of the bar.",
      "importance.csv", ["--x", "feature", "--y", "importance", "--with", "bars", "--yerr", "std", "--term", "dumb", "--size", "56x12"], "txt"),
@@ -231,7 +235,7 @@ table --format csv ... | plot --x day --y net --term dumb          # the same ch
 <pre><code>@TICKS@</code></pre>
 
 <h2>What is there, and what is not</h2>
-<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Box plots (<code>--with box</code>). Heatmaps (<code>--with heat --z</code>). Curves that plot computes (<code>--curve roc|ecdf|qq</code>). Not built yet: <code>--logy</code>, <code>--by</code>, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
+<p>Built: points and lines, bars with text categories (grouped for several series), error bars (<code>--yerr</code>), up to five series, a title, markers (<code>--vline</code>, <code>--hline</code>), bands (<code>--band</code>) and the diagonal (<code>--diag</code>), as SVG or as text. Intervals by their ends (<code>--ylo</code>, <code>--yhi</code>), text categories on points (<code>--categories</code>), and the JSON of <code>stats</code> and <code>ml</code> read directly (<code>--json PATH</code>). Histograms (<code>--with hist</code>, from the edges and counts of <code>stats describe</code>). Box plots (<code>--with box</code>). Heatmaps (<code>--with heat --z</code>). Curves that plot computes (<code>--curve roc|ecdf|qq</code>). A log y axis (<code>--logy</code>) and one series for each value of a column (<code>--by</code>). Not built yet, a gnuplot-like script, PNG. The plan for the statistics and machine-learning charts is section 19 of the design. The design, with what was measured and what was only chosen, is <a href="https://github.com/alpibrusl/cancho-plot/blob/main/docs/design.md">docs/design.md</a>.</p>
 
 <footer>EUPL-1.2, copyright Alpibru S.L. &#183; <a href="https://github.com/alpibrusl/cancho-plot">github.com/alpibrusl/cancho-plot</a></footer>
 </main>

@@ -94,13 +94,13 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
     var i = 0;
     let (xl0, xh0, xok) = axis.fix(xlo, xhi);
     let (yl0, yh0, yok) = axis.fix(ylo, yhi);
-    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6);
-    let (ylo2, yhi2, ym, ye, yk0, yk1) = axis.axis(yl0, yh0, 5);
+    let (xlo2, xhi2, xm, xe, xk0, xk1) = axis.axis(xl0, xh0, 6, false);
+    let (ylo2, yhi2, ym, ye, yk0, yk1) = axis.axis(yl0, yh0, 5, ac[8] == 1);
     // the width of the longest y label decides the left margin
     var g = 0;
     var q = yk0;
     while q <= yk1 {
-        let (lb, ln) = axis.used(ticks.label(heap, buffer.empty(heap, 16), q, ym, ye));
+        let (lb, ln) = axis.used(axis.label_y(heap, buffer.empty(heap, 16), q, ym, ye, ac));
         buffer.drop(heap, lb);
         if ln > g {
             g = ln;
@@ -224,7 +224,7 @@ pub fn render[&h, &t, &a, &b, &c, &d, &g2, &z, &e, &f](heap: &!h Heap, text: &t 
         out = put(heap, out, "\" y=\"");
         out = num(heap, out, yy + 4.0);
         out = put(heap, out, "\" text-anchor=\"end\">");
-        out = ticks.label(heap, out, q, ym, ye);
+        out = axis.label_y(heap, out, q, ym, ye, ac);
         out = put(heap, out, "</text>");
         out = nl(heap, out);
         q = q + 1;

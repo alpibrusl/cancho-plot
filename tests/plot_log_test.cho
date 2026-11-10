@@ -1,0 +1,278 @@
+edition 9;
+
+// --logy and --by (docs/design.md section 33): the axis of 1 to 1000, the labels of a log tick, the widening to whole exponents, every refusal; the pivot of --by and its refusals. Run by `cancho test` with lib/plot/*.cho.
+import plot.axis;
+import plot.by;
+import plot.chart;
+import plot.ticks;
+import std.buffer;
+import std.bytes;
+import std.test;
+
+// the chart of `table` (x, y) with the log axis, a line, an optional --hline (nh = 1), `bars` for --with bars, `diag` for --diag, `yerr` for --yerr y: (code, line, text)
+fn log_chart[&h, &t](heap: &!h Heap, table: &t [byte], svg_term: bool, nh: int, hl: float, kind: int, diag: int, yerr: &static [byte]) -> [heap] (int, int, buffer.Buffer) {
+    var rc = 0;
+    var rl = 0;
+    var rb = buffer.empty(heap, 1);
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](9, 0);
+        ann[8] = hl;
+        ac[1] = nh;
+        ac[3] = diag;
+        ac[4] = kind;
+        ac[8] = 1;
+        if len(yerr) > 0 {
+            ac[5] = 1;
+        }
+        var w = 30;
+        var hh = 10;
+        if svg_term {
+            w = 640;
+            hh = 400;
+        }
+        let (code, line, out) = chart.draw(heap, table, "x", "y", yerr, "", "", w, hh, "", false, true, svg_term, ann, ac);
+        rc = code;
+        rl = line;
+        buffer.drop(heap, rb);
+        rb = out;
+    }
+    return (rc, rl, rb);
+}
+
+fn test_dumb_axis_of_one_to_a_thousand[&h](heap: &!h Heap) -> [heap] int {
+    let (code, line, out) = log_chart(heap, "x,y\n1,1\n2,10\n3,100\n4,1000\n", false, 0, 0.0, 0, 0, "");
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.equal(buffer.bytes(g), "1000 |                            **\n     |                         ***\n     |                      ***\n 100 |                   ***\n     |               ****\n     |            ***\n  10 |         ***\n     |     ****\n     |  ***\n   1 |**\n     +------------------------------\n      1.0 1.5  2.0  2.5  3.0  3.5\n* y\n");
+    }
+    buffer.drop(heap, out);
+    return test.assert(ok);
+}
+
+fn test_dumb_hline_is_on_its_tick[&h](heap: &!h Heap) -> [heap] int {
+    // the marker at 10 is on the row of the tick 10
+    let (code, line, out) = log_chart(heap, "x,y\n1,1\n2,10\n3,100\n4,1000\n", false, 1, 10.0, 0, 0, "");
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.find(buffer.bytes(g), "  10 |---------***------------------\n") >= 0;
+    }
+    buffer.drop(heap, out);
+    return test.assert(ok);
+}
+
+fn test_svg_labels_and_heights[&h](heap: &!h Heap) -> [heap] int {
+    let (code, line, out) = log_chart(heap, "x,y\n1,1\n2,10\n3,100\n4,1000\n", true, 0, 0.0, 0, 0, "");
+    test.assert(code == 0);
+    borrow out as &g in {
+        let b = buffer.bytes(g);
+        // the plot area is 12 to 356 high: three decades of 114.67, and a label is 4 below its tick
+        test.assert(bytes.find(b, "<text x=\"36\" y=\"360\" text-anchor=\"end\">1</text>") >= 0);
+        test.assert(bytes.find(b, "<text x=\"36\" y=\"245.33\" text-anchor=\"end\">10</text>") >= 0);
+        test.assert(bytes.find(b, "<text x=\"36\" y=\"130.67\" text-anchor=\"end\">100</text>") >= 0);
+        test.assert(bytes.find(b, "<text x=\"36\" y=\"16\" text-anchor=\"end\">1000</text>") >= 0);
+    }
+    buffer.drop(heap, out);
+    return 0;
+}
+
+fn test_a_narrow_range_is_widened_to_a_decade[&h](heap: &!h Heap) -> [heap] int {
+    // 3 and 5 lie between the ticks 1 and 10
+    let (code, line, out) = log_chart(heap, "x,y\n1,3\n2,5\n", false, 0, 0.0, 0, 0, "");
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        let b = buffer.bytes(g);
+        ok = bytes.starts_with(b, "10 |") && bytes.find(b, "\n 1 |") >= 0;
+    }
+    buffer.drop(heap, out);
+    return test.assert(ok);
+}
+
+fn refused[&h, &t](heap: &!h Heap, table: &t [byte], nh: int, hl: float, kind: int, diag: int, yerr: &static [byte], want: int, want_line: int) -> [heap] int {
+    let (code, line, out) = log_chart(heap, table, false, nh, hl, kind, diag, yerr);
+    buffer.drop(heap, out);
+    test.assert(code == want);
+    return test.assert(line == want_line);
+}
+
+fn test_log_refusals[&h](heap: &!h Heap) -> [heap] int {
+    refused(heap, "x,y\n1,5\n2,0\n", 0, 0.0, 0, 0, "", 19, 3);
+    refused(heap, "x,y\n1,0.0-1\n", 0, 0.0, 0, 0, "", 2, 2);
+    refused(heap, "x,y\n1,-3\n2,4\n", 0, 0.0, 0, 0, "", 19, 2);
+    refused(heap, "x,y\n1,5\n", 1, 0.0, 0, 0, "", 19, 0);
+    refused(heap, "x,y\n1,5\n", 1, -2.0, 0, 0, "", 19, 0);
+    refused(heap, "x,y\n1,5\n", 0, 0.0, 1, 0, "", 11, 0);
+    refused(heap, "x,y\n1,5\n", 0, 0.0, 0, 1, "", 11, 0);
+    refused(heap, "x,y\n1,5\n", 0, 0.0, 0, 0, "y", 11, 0);
+    return 0;
+}
+
+fn test_log_tick_labels[&h](heap: &!h Heap) -> [heap] int {
+    // k * m * 10^e is the exponent
+    test.assert(label(heap, 0, 1, 0, "1"));
+    test.assert(label(heap, 3, 1, 0, "1000"));
+    test.assert(label(heap, 1, 2, 0, "100"));
+    test.assert(label(heap, 6, 1, 0, "1000000"));
+    test.assert(label(heap, 7, 1, 0, "1e7"));
+    test.assert(label(heap, 1, 1, 1, "1e10"));
+    test.assert(label(heap, 0 - 1, 1, 0, "0.1"));
+    test.assert(label(heap, 0 - 3, 1, 0, "0.001"));
+    test.assert(label(heap, 0 - 6, 1, 0, "0.000001"));
+    test.assert(label(heap, 0 - 7, 1, 0, "1e-7"));
+    test.assert(label(heap, 0 - 25, 1, 0, "1e-25"));
+    return 0;
+}
+
+fn label[&h](heap: &!h Heap, k: int, m: int, e: int, want: &static [byte]) -> [heap] bool {
+    let b = ticks.label_log(heap, buffer.empty(heap, 16), k, m, e);
+    var ok = false;
+    borrow b as &g in {
+        ok = bytes.equal(buffer.bytes(g), want);
+    }
+    buffer.drop(heap, b);
+    return ok;
+}
+
+fn test_axis_steps_are_whole_exponents() -> [] int {
+    // a span of 1 aimed at 5 intervals would be 0.2; on a log axis it is 1
+    let (lo, hi, m, e, k0, k1) = axis.axis(0.0, 1.0, 5, true);
+    test.assert(m == 1 && e == 0 && k0 == 0 && k1 == 1);
+    // 12 decades aimed at 5: 2.4 is a step of 2
+    let (lo2, hi2, m2, e2, a2, b2) = axis.axis(0.0, 12.0, 5, true);
+    test.assert(m2 == 2 && e2 == 0 && a2 == 0 && b2 == 6);
+    // without the log axis, the same span has the ticks of section 10
+    let (lo3, hi3, m3, e3, a3, b3) = axis.axis(0.0, 1.0, 5, false);
+    test.assert(m3 == 2 && e3 == 0 - 1);
+    return 0;
+}
+
+fn pivot_is[&h, &t](heap: &!h Heap, input: &t [byte], want: &static [byte], want_groups: int) -> [heap] int {
+    let (code, line, groups, out) = by.to_csv(heap, input, "x", "y", "g");
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.equal(buffer.bytes(g), want);
+    }
+    buffer.drop(heap, out);
+    test.assert(code == 0);
+    test.assert(groups == want_groups);
+    return test.assert(ok);
+}
+
+fn by_refused[&h, &t](heap: &!h Heap, input: &t [byte], want: int, want_line: int) -> [heap] int {
+    let (code, line, groups, out) = by.to_csv(heap, input, "x", "y", "g");
+    buffer.drop(heap, out);
+    test.assert(code == want);
+    return test.assert(line == want_line);
+}
+
+fn test_by_pivots[&h](heap: &!h Heap) -> [heap] int {
+    pivot_is(heap, "x,g,y\n1,a,100\n2,a,10\n1,b,50\n2,b,20\n", "x,a,b\n1,100,50\n2,10,20\n", 2);
+    // the rows of the groups may be interleaved; the order of the columns is the order of first appearance
+    pivot_is(heap, "g,y,x\nb,50,1\na,100,1\nb,20,2\na,10,2\n", "x,b,a\n1,50,100\n2,20,10\n", 2);
+    pivot_is(heap, "x,y,g\n5,7,only\n6,8,only\n", "x,only\n5,7\n6,8\n", 1);
+    pivot_is(heap, "x,y,g\n1,1,a\n1,2,b\n1,3,c\n1,4,d\n1,5,e\n", "x,a,b,c,d,e\n1,1,2,3,4,5\n", 5);
+    return 0;
+}
+
+fn test_by_refusals[&h](heap: &!h Heap) -> [heap] int {
+    by_refused(heap, "", 4, 0);
+    by_refused(heap, "x,y,g\n", 4, 0);
+    by_refused(heap, "x,y,g\n1,2,\"a\"\n", 1, 0);
+    by_refused(heap, "x,y,h\n1,2,a\n", 5, 0);
+    by_refused(heap, "x,y,g\n1,2,a\n1,z,a\n", 2, 3);
+    by_refused(heap, "x,y,g\n1,2,a\n1,2\n", 3, 3);
+    by_refused(heap, "x,y,g\n1,1,a\n1,1,b\n1,1,c\n1,1,d\n1,1,e\n1,1,f\n", 8, 7);
+    by_refused(heap, "x,y,g\n1,1,a\n1,1,\t\n", 10, 3);
+    // b gives another x at the first position; b has a row too many; b has a row too few
+    by_refused(heap, "x,y,g\n1,1,a\n2,1,a\n1,1,b\n3,1,b\n", 20, 5);
+    by_refused(heap, "x,y,g\n1,1,a\n1,1,b\n2,1,b\n", 20, 4);
+    by_refused(heap, "x,y,g\n1,1,a\n2,1,a\n1,1,b\n", 20, 0);
+    return 0;
+}
+
+// two series a and b, and one band (nb = 1) from lo to hi
+fn log_chart2[&h, &t](heap: &!h Heap, table: &t [byte], ycols: &static [byte], nb: int, lo: float, hi: float) -> [heap] (int, int, buffer.Buffer) {
+    var rc = 0;
+    var rl = 0;
+    var rb = buffer.empty(heap, 1);
+    region r {
+        let ann = alloc_slice[r](24, 0.0);
+        let ac = alloc_slice[r](9, 0);
+        ann[16] = lo;
+        ann[17] = hi;
+        ac[2] = nb;
+        ac[8] = 1;
+        let (code, line, out) = chart.draw(heap, table, "x", ycols, "", "", "", 30, 10, "", false, true, false, ann, ac);
+        rc = code;
+        rl = line;
+        buffer.drop(heap, rb);
+        rb = out;
+    }
+    return (rc, rl, rb);
+}
+
+fn test_log_band_and_second_series[&h](heap: &!h Heap) -> [heap] int {
+    // the band from 10 to 100 fills the rows of the ticks 100 down to 10
+    let (code, line, out) = log_chart2(heap, "x,y\n1,1\n2,10\n3,100\n4,1000\n", "y", 1, 10.0, 100.0);
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.equal(buffer.bytes(g), "1000 |                            **\n     |                         ***\n     |                      ***\n 100 |:::::::::::::::::::***::::::::\n     |:::::::::::::::****:::::::::::\n     |::::::::::::***:::::::::::::::\n  10 |:::::::::***::::::::::::::::::\n     |     ****\n     |  ***\n   1 |**\n     +------------------------------\n      1.0 1.5  2.0  2.5  3.0  3.5\n* y\n");
+    }
+    buffer.drop(heap, out);
+    test.assert(ok);
+    // a value in the second series that is not above 0 is on its own row
+    let (c2, l2, o2) = log_chart2(heap, "x,a,b\n1,5,2\n2,5,0\n", "a,b", 0, 0.0, 0.0);
+    buffer.drop(heap, o2);
+    test.assert(c2 == 19);
+    test.assert(l2 == 3);
+    // either end of a band that is not above 0
+    let (c3, l3, o3) = log_chart2(heap, "x,y\n1,5\n", "y", 1, 0.0, 10.0);
+    buffer.drop(heap, o3);
+    test.assert(c3 == 19);
+    let (c4, l4, o4) = log_chart2(heap, "x,y\n1,5\n", "y", 1, 1.0, 0.0);
+    buffer.drop(heap, o4);
+    test.assert(c4 == 19);
+    return 0;
+}
+
+fn test_one_decade_when_all_values_are_equal[&h](heap: &!h Heap) -> [heap] int {
+    // 10 and 10: the axis is the decade from 10 to 100, not 1 to 100
+    let (code, line, out) = log_chart(heap, "x,y\n1,10\n2,10\n", false, 0, 0.0, 0, 0, "");
+    test.assert(code == 0);
+    var ok = false;
+    borrow out as &g in {
+        let b = buffer.bytes(g);
+        ok = bytes.starts_with(b, "100 |\n") && bytes.find(b, "\n 10 |*") >= 0 && bytes.find(b, "\n  1 |") < 0;
+    }
+    buffer.drop(heap, out);
+    return test.assert(ok);
+}
+
+fn test_by_limits_and_columns[&h](heap: &!h Heap) -> [heap] int {
+    var t = buffer.append(heap, buffer.empty(heap, 64), "x,y,g\n");
+    var i = 0;
+    while i < 4999 {
+        t = buffer.append(heap, t, "1,1,a\n");
+        i = i + 1;
+    }
+    borrow t as &g in {
+        let (code, line, groups, out) = by.to_csv(heap, buffer.bytes(g), "x", "y", "g");
+        buffer.drop(heap, out);
+        test.assert(code == 0);
+        test.assert(groups == 1);
+    }
+    t = buffer.append(heap, t, "1,1,a\n");
+    borrow t as &g2 in {
+        by_refused(heap, buffer.bytes(g2), 6, 0);
+    }
+    buffer.drop(heap, t);
+    by_refused(heap, "a,y,g\n1,2,a\n", 5, 0);
+    by_refused(heap, "x,b,g\n1,2,a\n", 5, 0);
+    // a row too many whose x is 0
+    by_refused(heap, "x,y,g\n1,1,a\n1,1,b\n0,1,b\n", 20, 4);
+    return 0;
+}

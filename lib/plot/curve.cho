@@ -77,7 +77,7 @@ fn sort2[&a, &b](v: &!a [float], w: &!b [int], n: int) -> [] int {
     return 0;
 }
 
-fn put_cell[&h](heap: &!h Heap, b: buffer.Buffer, x: float, derived: bool) -> [heap] buffer.Buffer {
+pub fn put_cell[&h](heap: &!h Heap, b: buffer.Buffer, x: float, derived: bool) -> [heap] buffer.Buffer {
     var out = b;
     region a {
         let sc = alloc_slice[a](400, byte_of(0));
@@ -274,4 +274,17 @@ pub fn to_csv[&h, &t, &x, &y](heap: &!h Heap, text: &t [byte], kind: int, xspec:
     unbox_slice(heap, labb);
     unbox_slice(heap, valb);
     return (code, line, out);
+}
+
+// does the text hold a byte below 0x20 or the byte 0x7f
+pub fn has_control[&t](text: &t [byte]) -> [] bool {
+    var i = 0;
+    while i < len(text) {
+        let c = int_of(text[i]);
+        if c < 32 || c == 127 {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
 }
