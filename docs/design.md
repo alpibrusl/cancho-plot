@@ -414,3 +414,23 @@ Writing them found one thing in the program: the text chart printed an empty lin
 (`kh > 0` in the refusal, which `ke > 0` and the checks before it already cover, here and in the histogram's; and the legend count in `dumb`, made redundant by dropping the line), every mutant that still applies is killed: 32 of 32 in the main run and the 5 for the rewritten refusals.
 
 **Not yet:** heatmaps, the curves computed by `plot` (ROC, empirical CDF, Q-Q), `--logy`, `--by`, horizontal bars.
+
+## 29. Slice 5d-2: heatmaps [choice, before the code]
+
+    plot --x XCOL --y YCOL --z VALUE --with heat ...
+    stats corr --cols a,b,c FILE | plot --json data.pairs --x x --y y --z r --with heat
+
+**Input.** One row for each cell: a label for the column in `--x`, a label for the row in `--y` (one column: a different count is `plot.usage`), and a number in `--z` (a flag the histogram's `--xhi` shares: it is the one extra column a kind takes). Labels are text (the checks of bars apply); the categories of each axis are
+numbered in the order in which they first appear, and may be at most 50 each, 2,500 rows in all (`plot.too-many-points`). A cell given twice is `plot.duplicate-cell`; a cell not given is blank. `--yerr`, `--ylo`, `--yhi`, `--xhi` and `--categories` with `heat` are `plot.usage`.
+This is the long form `stats corr` prints (`pairs` of `x`, `y`, `r`) and the one a confusion matrix has as rows `actual,predicted,count`.
+
+**Scale.** vmin and vmax are the least and greatest value; t = (v - vmin) / (vmax - vmin), and 0.5 for all cells when vmax = vmin. The two numbers are written under the chart as the cells' own text (the text of the first cell that holds each).
+
+**`dumb`.** With nx columns of cells and ny rows, a cell is cw = floor(W / nx) columns by ch = floor(H / ny) rows, at least 1 each (`plot.size-invalid` otherwise); the chart is nx cw by ny ch. A cell holds the glyph of level min(9, floor(10 t)) in the ramp ` .:-=+*#%@` (t = 0.5 is level 5, `+`... counted from 0: ` `, `.`, `:`, `-`, `=`, `+`). A row is
+its label (the first 10 bytes, right-aligned in a gutter as wide as the longest label, on the first line of its block, blank on the others), a space, `|`, the cells. Then the axis row, `+` and nx cw `-`, in the gutter's width of spaces plus a space; the labels of the columns on one line, each cut to 10 bytes and centred
+on the middle of its block, left out when it would touch the one before (section 11's rule); then the line `min V  max V`. The title is as before.
+
+**`svg`.** The margins of section 13 (left = 12 + 8 g with g the longest label cut to 10, top 36 or 12, bottom 44, right 16; a plot area under 20 is `plot.size-invalid`). Cell (i, j) is `<rect x="x0 + i sw" y="y1 + j sh" width="sw" height="sh" fill="var(--series-1, #0550ae)" fill-opacity="O"/>`, sw = (x1 - x0) / nx, sh = (y2 - y1) / ny, O = 0.05 + 0.9 t (two decimals). Where
+sw is at least 30 and sh at least 14, the value is written in the cell, `<text x="centre" y="centre + 4" text-anchor="middle">`, as the cell's own text cut to 6 bytes. The row labels are at x0 - 8 (`text-anchor="end"`, y the centre + 4), the column labels at y2 + 18 (the rule of bars), and the line `min V  max V` at x0, y = H - 8.
+
+**Gate.** `cancho test`: hand-worked charts in both terminals (three by three with a blank cell, a constant matrix, one cell), every refusal, the JSON path on a real `stats corr` document; the mutant measurement as before.
