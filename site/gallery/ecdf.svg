@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 320" width="480" height="320" role="img" aria-label="ECDF of the example scores: 1 series, 20 points">
+<g fill="none" stroke="currentColor" stroke-width="1">
+<path d="M 36 36 V 276 H 464"/>
+<path d="M 36 276 h-4"/>
+<path d="M 36 228 h-4"/>
+<path d="M 36 180 h-4"/>
+<path d="M 36 132 h-4"/>
+<path d="M 36 84 h-4"/>
+<path d="M 36 36 h-4"/>
+<path d="M 36 276 v4"/>
+<path d="M 78.8 276 v4"/>
+<path d="M 121.6 276 v4"/>
+<path d="M 164.4 276 v4"/>
+<path d="M 207.2 276 v4"/>
+<path d="M 250 276 v4"/>
+<path d="M 292.8 276 v4"/>
+<path d="M 335.6 276 v4"/>
+<path d="M 378.4 276 v4"/>
+<path d="M 421.2 276 v4"/>
+<path d="M 464 276 v4"/>
+</g>
+<g font-family="sans-serif" font-size="12" fill="currentColor">
+<text x="240" y="20" text-anchor="middle" font-size="14">ECDF of the example scores</text>
+<text x="28" y="280" text-anchor="end">0.0</text>
+<text x="28" y="232" text-anchor="end">0.2</text>
+<text x="28" y="184" text-anchor="end">0.4</text>
+<text x="28" y="136" text-anchor="end">0.6</text>
+<text x="28" y="88" text-anchor="end">0.8</text>
+<text x="28" y="40" text-anchor="end">1.0</text>
+<text x="36" y="294" text-anchor="middle">0.0</text>
+<text x="78.8" y="294" text-anchor="middle">0.1</text>
+<text x="121.6" y="294" text-anchor="middle">0.2</text>
+<text x="164.4" y="294" text-anchor="middle">0.3</text>
+<text x="207.2" y="294" text-anchor="middle">0.4</text>
+<text x="250" y="294" text-anchor="middle">0.5</text>
+<text x="292.8" y="294" text-anchor="middle">0.6</text>
+<text x="335.6" y="294" text-anchor="middle">0.7</text>
+<text x="378.4" y="294" text-anchor="middle">0.8</text>
+<text x="421.2" y="294" text-anchor="middle">0.9</text>
+<text x="464" y="294" text-anchor="middle">1.0</text>
+<text x="50" y="312">F</text>
+</g>
+<path d="M 70.24 264 L 87.36 252 L 113.04 240 L 130.16 228 L 164.4 216 L 168.68 204 L 185.8 192 L 211.48 180 L 228.6 168 L 237.16 156 L 258.56 144 L 271.4 132 L 284.24 120 L 301.36 108 L 318.48 96 L 339.88 84 L 365.56 72 L 391.24 60 L 421.2 48 L 442.6 36" fill="none" stroke="var(--series-1, #0550ae)" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="36" y="303" width="10" height="10" fill="var(--series-1, #0550ae)"/>
+</svg>

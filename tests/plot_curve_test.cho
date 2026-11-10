@@ -1,0 +1,168 @@
+edition 9;
+
+// Curves computed by plot (docs/design.md section 31): the tables are worked out by hand, and every refusal code is reached. Run by `cancho test` with lib/plot/*.cho.
+import plot.curve;
+import std.buffer;
+import std.bytes;
+import std.test;
+
+fn table_is[&h, &t](heap: &!h Heap, input: &t [byte], kind: int, xs: &static [byte], ys: &static [byte], want: &static [byte]) -> [heap] int {
+    let (code, line, out) = curve.to_csv(heap, input, kind, xs, ys);
+    var ok = false;
+    borrow out as &g in {
+        ok = bytes.equal(buffer.bytes(g), want);
+    }
+    buffer.drop(heap, out);
+    test.assert(code == 0);
+    return test.assert(ok);
+}
+
+fn refused[&h, &t](heap: &!h Heap, input: &t [byte], kind: int, xs: &static [byte], ys: &static [byte], want_code: int, want_line: int) -> [heap] int {
+    let (code, line, out) = curve.to_csv(heap, input, kind, xs, ys);
+    buffer.drop(heap, out);
+    test.assert(code == want_code);
+    return test.assert(line == want_line);
+}
+
+fn near(a: float, b: float, tol: float) -> [] bool {
+    var d = a - b;
+    if d < 0.0 {
+        d = 0.0 - d;
+    }
+    return d <= tol;
+}
+
+fn test_ecdf_steps[&h](heap: &!h Heap) -> [heap] int {
+    // 1 once, 2 twice, 3 once: 1/4, 3/4, 4/4
+    table_is(heap, "v\n3\n1\n2\n2\n", 1, "v", "", "value,F\n1,0.25\n2,0.75\n3,1\n");
+    return 0;
+}
+
+fn test_ecdf_reverse_sorted[&h](heap: &!h Heap) -> [heap] int {
+    table_is(heap, "v\n8\n7\n6\n5\n4\n3\n2\n1\n", 1, "v", "", "value,F\n1,0.125\n2,0.25\n3,0.375\n4,0.5\n5,0.625\n6,0.75\n7,0.875\n8,1\n");
+    return 0;
+}
+
+fn test_ecdf_column_by_number[&h](heap: &!h Heap) -> [heap] int {
+    table_is(heap, "a,b\n9,2\n9,1\n", 1, "2", "", "value,F\n1,0.5\n2,1\n");
+    return 0;
+}
+
+fn test_roc_auc_three_quarters[&h](heap: &!h Heap) -> [heap] int {
+    // scores high to low: 0.8 (1), 0.4 (0), 0.35 (1), 0.1 (0); two of each class
+    table_is(heap, "y,s\n0,0.1\n0,0.4\n1,0.35\n1,0.8\n", 2, "y", "s", "fpr,tpr auc 0.750\n0,0\n0,0.5\n0.5,0.5\n0.5,1\n1,1\n");
+    return 0;
+}
+
+fn test_roc_perfect_and_reversed[&h](heap: &!h Heap) -> [heap] int {
+    table_is(heap, "y,s\n0,0.1\n0,0.2\n1,0.8\n1,0.9\n", 2, "y", "s", "fpr,tpr auc 1.000\n0,0\n0,0.5\n0,1\n0.5,1\n1,1\n");
+    table_is(heap, "y,s\n1,0.1\n1,0.2\n0,0.8\n0,0.9\n", 2, "y", "s", "fpr,tpr auc 0.000\n0,0\n0.5,0\n1,0\n1,0.5\n1,1\n");
+    return 0;
+}
+
+fn test_roc_ties_are_one_step[&h](heap: &!h Heap) -> [heap] int {
+    // a 1 and a 0 with the same score are crossed together, which is the diagonal
+    table_is(heap, "y,s\n1,0.5\n0,0.5\n", 2, "y", "s", "fpr,tpr auc 0.500\n0,0\n1,1\n");
+    return 0;
+}
+
+fn test_qq_one_value_is_at_zero[&h](heap: &!h Heap) -> [heap] int {
+    table_is(heap, "v\n7\n", 3, "v", "", "theoretical,sample\n0,7\n");
+    return 0;
+}
+
+fn test_qq_rows_are_sorted_with_the_quantiles[&h](heap: &!h Heap) -> [heap] int {
+    let (code, line, out) = curve.to_csv(heap, "v\n10\n30\n20\n", 3, "v", "");
+    test.assert(code == 0);
+    borrow out as &g in {
+        let b = buffer.bytes(g);
+        // header, then z(1/6) < 0 and sample 10; z(1/2) = 0 and 20; z(5/6) > 0 and 30
+        test.assert(bytes.starts_with(b, "theoretical,sample\n-0.967"));
+        test.assert(bytes.find(b, ",10\n0,20\n0.967") > 0);
+        test.assert(bytes.ends_with(b, ",30\n"));
+    }
+    buffer.drop(heap, out);
+    return 0;
+}
+
+fn test_normal_quantile_known_values() -> [] int {
+    test.assert(curve.normal_quantile(0.5) == 0.0);
+    test.assert(near(curve.normal_quantile(0.975), 1.959964, 0.00001));
+    test.assert(near(curve.normal_quantile(0.9), 1.281552, 0.00001));
+    test.assert(near(curve.normal_quantile(0.001), 0.0 - 3.090232, 0.00001));
+    test.assert(near(curve.normal_quantile(0.999), 3.090232, 0.00001));
+    test.assert(near(curve.normal_quantile(0.02), 0.0 - 2.053749, 0.00001));
+    test.assert(near(curve.normal_quantile(0.98), 2.053749, 0.00001));
+    return 0;
+}
+
+fn test_refusals[&h](heap: &!h Heap) -> [heap] int {
+    refused(heap, "", 1, "v", "", 4, 0);
+    refused(heap, "v\n", 1, "v", "", 4, 0);
+    refused(heap, "v\n1\n", 1, "w", "", 5, 0);
+    refused(heap, "y,s\n1,2\n", 2, "y", "t", 5, 0);
+    refused(heap, "v\n1\nx\n", 1, "v", "", 2, 3);
+    refused(heap, "v\n\"1\"\n", 1, "v", "", 1, 0);
+    refused(heap, "a,b\n1,2\n3\n", 1, "a", "", 3, 3);
+    refused(heap, "y,s\n0,1\n2,3\n1,4\n", 2, "y", "s", 17, 3);
+    refused(heap, "y,s\n0,1\nx,3\n", 2, "y", "s", 17, 3);
+    refused(heap, "y,s\n0,1\n1,z\n", 2, "y", "s", 2, 3);
+    refused(heap, "y,s\n1,1\n1,3\n", 2, "y", "s", 18, 0);
+    refused(heap, "y,s\n0,1\n0,3\n", 2, "y", "s", 18, 0);
+    return 0;
+}
+
+fn test_row_limit[&h](heap: &!h Heap) -> [heap] int {
+    var t = buffer.append(heap, buffer.empty(heap, 64), "v\n");
+    var i = 0;
+    while i < 5000 {
+        t = buffer.append(heap, t, "1\n");
+        i = i + 1;
+    }
+    borrow t as &g in {
+        refused(heap, buffer.bytes(g), 1, "v", "", 6, 0);
+    }
+    buffer.drop(heap, t);
+    return 0;
+}
+
+fn test_roc_area_is_the_pair_count[&h](heap: &!h Heap) -> [heap] int {
+    // the example of the gallery: 10 negatives, 10 positives; the positives beat 4, 7, 9, 9, 9, 10, 10, 10, 10, 10 of the negatives, 88 pairs of 100, no tie
+    let (code, line, out) = curve.to_csv(heap, "label,score\n0,0.08\n0,0.12\n0,0.18\n0,0.22\n0,0.31\n0,0.35\n0,0.41\n0,0.47\n0,0.52\n0,0.66\n1,0.30\n1,0.45\n1,0.55\n1,0.58\n1,0.62\n1,0.71\n1,0.77\n1,0.83\n1,0.9\n1,0.95\n", 2, "label", "score");
+    test.assert(code == 0);
+    borrow out as &g in {
+        test.assert(bytes.starts_with(buffer.bytes(g), "fpr,tpr auc 0.880\n0,0\n0,0.1\n"));
+        test.assert(bytes.ends_with(buffer.bytes(g), "\n1,1\n"));
+    }
+    buffer.drop(heap, out);
+    return 0;
+}
+
+fn test_roc_unequal_classes[&h](heap: &!h Heap) -> [heap] int {
+    // one positive, two negatives: the rates are divided by their own class sizes
+    table_is(heap, "y,s\n1,0.9\n0,0.5\n0,0.1\n", 2, "y", "s", "fpr,tpr auc 1.000\n0,0\n0,1\n0.5,1\n1,1\n");
+    // the positive beats two of three negatives: 2/3, rounded up to 0.667 (not cut to 0.666)
+    table_is(heap, "y,s\n0,0.1\n0,0.2\n1,0.5\n0,0.8\n", 2, "y", "s", "fpr,tpr auc 0.667\n0,0\n0.333333333,0\n0.333333333,1\n0.666666667,1\n1,1\n");
+    return 0;
+}
+
+fn test_ecdf_nine_decimals_and_huge_values[&h](heap: &!h Heap) -> [heap] int {
+    table_is(heap, "v\n5\n6\n7\n", 1, "v", "", "value,F\n5,0.333333333\n6,0.666666667\n7,1\n");
+    // a value that is not whole keeps every digit; one past 1e15 is not cut to an integer
+    table_is(heap, "v\n2.5\n1e20\n", 1, "v", "", "value,F\n2.5e0,0.5\n1e20,1\n");
+    return 0;
+}
+
+fn test_row_limit_is_exact[&h](heap: &!h Heap) -> [heap] int {
+    var t = buffer.append(heap, buffer.empty(heap, 64), "v\n");
+    var i = 0;
+    while i < 4999 {
+        t = buffer.append(heap, t, "1\n");
+        i = i + 1;
+    }
+    borrow t as &g in {
+        table_is(heap, buffer.bytes(g), 1, "v", "", "value,F\n1,1\n");
+    }
+    buffer.drop(heap, t);
+    return 0;
+}

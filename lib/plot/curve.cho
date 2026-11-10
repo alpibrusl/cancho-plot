@@ -1,0 +1,277 @@
+edition 9;
+
+module plot.curve;
+
+import plot.csv;
+import plot.num;
+import std.buffer;
+import std.bytes;
+import std.fmt;
+import std.math;
+
+// Curves that plot computes from a table (docs/design.md section 31): the table of a curve is written as CSV and the chart reads it as any other.
+//
+// kind 1: ECDF   header `value,F`: one row for each distinct value v, (v, count of values <= v / n)
+// kind 2: ROC    header `fpr,tpr auc A`: (0, 0), then after each distinct score, from the highest, (false positives / negatives, true positives / positives)
+// kind 3: Q-Q    header `theoretical,sample`: row i of the sorted values (from 0) is (z((i + 0.5) / n), value), z the standard normal quantile
+//
+// The codes: 0 done; 1 a quote; 2 a cell is not a number (the line); 3 a line of the wrong width (the line); 4 no rows; 5 a column missing; 6 more rows than 4999; 17 a label of the ROC that is not 0 or 1 (the line); 18 the ROC has only one class.
+
+// the standard normal quantile of p, 0 < p < 1 (Acklam's rational approximation, relative error under 1.2e-9)
+pub fn normal_quantile(p: float) -> [] float {
+    let a0 = 0.0 - 39.69683028665376;
+    let a1 = 220.9460984245205;
+    let a2 = 0.0 - 275.9285104469687;
+    let a3 = 138.357751867269;
+    let a4 = 0.0 - 30.66479806614716;
+    let a5 = 2.506628277459239;
+    let b0 = 0.0 - 54.47609879822406;
+    let b1 = 161.5858368580409;
+    let b2 = 0.0 - 155.6989798598866;
+    let b3 = 66.80131188771972;
+    let b4 = 0.0 - 13.28068155288572;
+    let c0 = 0.0 - 0.007784894002430293;
+    let c1 = 0.0 - 0.3223964580411365;
+    let c2 = 0.0 - 2.400758277161838;
+    let c3 = 0.0 - 2.549732539343734;
+    let c4 = 4.374664141464968;
+    let c5 = 2.938163982698783;
+    let d0 = 0.007784695709041462;
+    let d1 = 0.3224671290700398;
+    let d2 = 2.445134137142996;
+    let d3 = 3.754408661907416;
+    let low = 0.02425;
+    if p < low {
+        let q = sqrt(0.0 - 2.0 * math.log(p));
+        return (((((c0 * q + c1) * q + c2) * q + c3) * q + c4) * q + c5) / ((((d0 * q + d1) * q + d2) * q + d3) * q + 1.0);
+    }
+    if p > 1.0 - low {
+        let q = sqrt(0.0 - 2.0 * math.log(1.0 - p));
+        return 0.0 - (((((c0 * q + c1) * q + c2) * q + c3) * q + c4) * q + c5) / ((((d0 * q + d1) * q + d2) * q + d3) * q + 1.0);
+    }
+    let q = p - 0.5;
+    let r = q * q;
+    return (((((a0 * r + a1) * r + a2) * r + a3) * r + a4) * r + a5) * q / (((((b0 * r + b1) * r + b2) * r + b3) * r + b4) * r + 1.0);
+}
+
+// shell sort of `v` ascending, `w` moved along with it
+fn sort2[&a, &b](v: &!a [float], w: &!b [int], n: int) -> [] int {
+    var gap = n / 2;
+    while gap > 0 {
+        var i = gap;
+        while i < n {
+            let tv = v[i];
+            let tw = w[i];
+            var j = i;
+            while j >= gap && v[j - gap] > tv {
+                v[j] = v[j - gap];
+                w[j] = w[j - gap];
+                j = j - gap;
+            }
+            v[j] = tv;
+            w[j] = tw;
+            i = i + 1;
+        }
+        gap = gap / 2;
+    }
+    return 0;
+}
+
+fn put_cell[&h](heap: &!h Heap, b: buffer.Buffer, x: float, derived: bool) -> [heap] buffer.Buffer {
+    var out = b;
+    region a {
+        let sc = alloc_slice[a](400, byte_of(0));
+        var k = 0;
+        if derived {
+            // nine decimals, the trailing zeros and a bare point dropped
+            k = fmt.float_fixed_into(sc, x, 9);
+            if k > 0 {
+                while k > 0 && int_of(sc[k - 1]) == 48 {
+                    k = k - 1;
+                }
+                if k > 0 && int_of(sc[k - 1]) == 46 {
+                    k = k - 1;
+                }
+            }
+        } else if x > 0.0 - 1.0e15 && x < 1.0e15 && float_of(truncate(x)) == x {
+            // a whole number as it is written
+            k = fmt.float_fixed_into(sc, x, 0);
+        } else {
+            // the shortest decimal that reads back to the same bits
+            k = fmt.float_into(sc, x);
+        }
+        if k > 0 {
+            out = buffer.append(heap, out, sc[0..k]);
+        }
+    }
+    return out;
+}
+
+// one row: a cell that is the data as given is written exactly, one that plot computed with nine decimals
+fn put_row[&h](heap: &!h Heap, b: buffer.Buffer, x: float, xd: bool, y: float, yd: bool) -> [heap] buffer.Buffer {
+    var out = put_cell(heap, b, x, xd);
+    out = buffer.push(heap, out, byte_of(','));
+    out = put_cell(heap, out, y, yd);
+    return buffer.push(heap, out, byte_of(10));
+}
+
+// the table of the curve `kind` of the columns `xspec` (the values, or the labels of a ROC) and `yspec` (the scores of a ROC; not read for the others): (code, line, table)
+pub fn to_csv[&h, &t, &x, &y](heap: &!h Heap, text: &t [byte], kind: int, xspec: &x [byte], yspec: &y [byte]) -> [heap] (int, int, buffer.Buffer) {
+    var out = buffer.empty(heap, 256);
+    if len(text) == 0 {
+        return (4, 0, out);
+    }
+    if csv.has_quote(text) {
+        return (1, 0, out);
+    }
+    let hend = csv.line_end(text, 0);
+    let width = csv.cells(text, 0, hend);
+    let xcol = csv.column(text, 0, hend, xspec);
+    var ycol = 0;
+    if kind == 2 {
+        ycol = csv.column(text, 0, hend, yspec);
+    }
+    if xcol < 0 || ycol < 0 {
+        return (5, 0, out);
+    }
+    var n = 0;
+    var at = csv.next_line(text, hend);
+    while at < len(text) {
+        n = n + 1;
+        at = csv.next_line(text, csv.line_end(text, at));
+    }
+    if n == 0 {
+        return (4, 0, out);
+    }
+    if n > 4999 {
+        return (6, 0, out);
+    }
+    var code = 0;
+    var line = 0;
+    // the arrays are on the heap: a region holds 64 KiB, and 4,999 rows of floats are 40 KB each
+    let valb = box_slice(heap, n, 0.0);
+    let labb = box_slice(heap, n, 0);
+    let pxb = box_slice(heap, n + 1, 0.0);
+    let pyb = box_slice(heap, n + 1, 0.0);
+    borrow mut valb as &!vw in {
+        borrow mut labb as &!lw in {
+            borrow mut pxb as &!pw in {
+                borrow mut pyb as &!qw in {
+                    let vals = contents(vw);
+                    let labs = contents(lw);
+                    let px = contents(pw);
+                    let py = contents(qw);
+                    var row = 0;
+                    var pos = csv.next_line(text, hend);
+                    while row < n && code == 0 {
+                        let end = csv.line_end(text, pos);
+                        line = row + 2;
+                        if csv.cells(text, pos, end) != width {
+                            code = 3;
+                        } else if kind == 2 {
+                            let (la, lb) = csv.cell(text, pos, end, xcol);
+                            let (sa, sb) = csv.cell(text, pos, end, ycol);
+                            let (lok, lv) = num.number(text[la..lb]);
+                            let (sok, sv) = num.number(text[sa..sb]);
+                            if !sok {
+                                code = 2;
+                            } else if !lok || !(lv == 0.0 || lv == 1.0) {
+                                code = 17;
+                            } else {
+                                vals[row] = sv;
+                                labs[row] = truncate(lv);
+                            }
+                        } else {
+                            let (a, b) = csv.cell(text, pos, end, xcol);
+                            let (ok, v) = num.number(text[a..b]);
+                            if !ok {
+                                code = 2;
+                            } else {
+                                vals[row] = v;
+                            }
+                        }
+                        pos = csv.next_line(text, end);
+                        row = row + 1;
+                    }
+                    if code == 0 {
+                        let s = sort2(vals, labs, n);
+                        let nf = float_of(n);
+                        if kind == 1 {
+                            out = buffer.append(heap, out, "value,F\n");
+                            var i = 0;
+                            while i < n {
+                                if i == n - 1 || vals[i + 1] != vals[i] {
+                                    out = put_row(heap, out, vals[i], false, float_of(i + 1) / nf, true);
+                                }
+                                i = i + 1;
+                            }
+                        } else if kind == 3 {
+                            out = buffer.append(heap, out, "theoretical,sample\n");
+                            var i = 0;
+                            while i < n {
+                                out = put_row(heap, out, normal_quantile((float_of(i) + 0.5) / nf), true, vals[i], false);
+                                i = i + 1;
+                            }
+                        } else {
+                            var pos_n = 0;
+                            var i = 0;
+                            while i < n {
+                                pos_n = pos_n + labs[i];
+                                i = i + 1;
+                            }
+                            let neg_n = n - pos_n;
+                            if pos_n == 0 || neg_n == 0 {
+                                code = 18;
+                                line = 0;
+                            } else {
+                                // the points first, in a second buffer, for the area; the header carries it
+                                var m = 1;
+                                var tp = 0;
+                                var fp = 0;
+                                var j = n - 1;
+                                while j >= 0 {
+                                    if labs[j] == 1 {
+                                        tp = tp + 1;
+                                    } else {
+                                        fp = fp + 1;
+                                    }
+                                    if j == 0 || vals[j - 1] != vals[j] {
+                                        px[m] = float_of(fp) / float_of(neg_n);
+                                        py[m] = float_of(tp) / float_of(pos_n);
+                                        m = m + 1;
+                                    }
+                                    j = j - 1;
+                                }
+                                var area = 0.0;
+                                var q = 1;
+                                while q < m {
+                                    area = area + (px[q] - px[q - 1]) * (py[q] + py[q - 1]) / 2.0;
+                                    q = q + 1;
+                                }
+                                // three decimals, rounded half up
+                                let milli = truncate(area * 1000.0 + 0.5);
+                                out = buffer.append(heap, out, "fpr,tpr auc ");
+                                out = buffer.push_nat(heap, out, milli / 1000);
+                                out = buffer.push(heap, out, byte_of('.'));
+                                out = buffer.push(heap, out, byte_of(48 + milli / 100 % 10));
+                                out = buffer.push(heap, out, byte_of(48 + milli / 10 % 10));
+                                out = buffer.push(heap, out, byte_of(48 + milli % 10));
+                                out = buffer.push(heap, out, byte_of(10));
+                                var w = 0;
+                                while w < m {
+                                    out = put_row(heap, out, px[w], true, py[w], true);
+                                    w = w + 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    unbox_slice(heap, pyb);
+    unbox_slice(heap, pxb);
+    unbox_slice(heap, labb);
+    unbox_slice(heap, valb);
+    return (code, line, out);
+}

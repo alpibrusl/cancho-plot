@@ -447,3 +447,37 @@ Heatmaps are built as section 29 says, in `lib/plot/heat.cho`, with the parsing 
 A first run killed 34 of 41; the seven that lived were real gaps, and tests were added for them.
 
 **Gallery.** `jsonheat` (svg) and `heattext` (dumb) draw the real `stats corr` document in `site/data/stats-corr.json`.
+
+## 31. Slice 5e: curves that plot computes (ECDF, ROC, Q-Q) [choice, before the code; built and measured in section 32]
+
+**Why in plot.** `ml` prints a score and `roc_auc`; the curve itself is a computation over the rows, which only the table has. A curve is a transformation of a table into a table, so it is written as CSV and the chart reads it as any other (no new drawing code).
+
+**The flag.** `--curve ecdf|roc|qq`, with `--x COL` (the column the curve is about) and, for roc only, `--y COL`. The chart is then drawn from the computed table: lines for ecdf and roc, points for qq. `--json PATH` composes (the document is turned into a table first, then the curve is computed). Everything else (`--term`, `--size`, `--title`, markers, `--diag`) works as before.
+
+**ECDF.** `--x v`. Sort the n values; for each distinct value v one row, (v, k / n) with k the count of values at or below v. Header `value,F`. The line joins the points; it is not a true staircase (a staircase would need 2 rows for each value, over the 5,000-row limit).
+
+**ROC.** `--x label --y score`; the label is exactly 0 or 1 (`plot.roc-label` otherwise, with the line), and both classes must be present (`plot.roc-classes`). With P positives and N negatives, walk the distinct scores from the highest; after each score, one row (FP / N, TP / P), after the first row (0, 0). Tied scores cross together, so a tie between a 1 and a 0 gives the diagonal step. The area is the trapezoid sum over the rows, written with three decimals in the name of the y series: `tpr auc 0.750`. Claim: this is the Mann-Whitney statistic (the share of pairs of a positive and a negative in which the positive scores higher, a tie counting one half), which is what `roc_auc` of `ml` is. The `ml` binary is not built in this checkout, so the equality is checked against the pair count worked by hand (88 of 100 pairs, 0.880, for the gallery table), not against `ml`. Hand-worked: scores 0.8 (1), 0.4 (0), 0.35 (1), 0.1 (0) give the rows (0,0) (0,.5) (.5,.5) (.5,1) (1,1) and area 0.75.
+
+**Q-Q (normal).** `--x v`. The sorted values against the standard normal quantiles at (i + 0.5) / n for i from 0. Header `theoretical,sample`. The quantile is Acklam's rational approximation (relative error under 1.2e-9, far below what a chart shows); known values are tested to 1e-5.
+
+**Numbers in the computed table.** Values the user gave are written as they read back exactly (a whole number as digits, else the shortest decimal that round-trips); values plot computed (F, FPR, TPR, the quantile) with nine decimals, trailing zeros dropped.
+
+**Limits and refusals.** 4,999 rows at most (the ROC adds a row), else `plot.too-many-points`. Every existing table refusal keeps its tag (`plot.csv-quote`, `plot.csv-shape`, `plot.not-numeric`, `plot.column-missing`, `plot.empty`), with the line of the row.
+
+**Not in this slice:** `--by` (one curve for each group), `--logy`, a staircase ECDF, and the scores of `ml` read directly from its JSON (ml prints the area, not the scores).
+
+## 32. Slice 5e, built [measured]
+
+`--curve ecdf|roc|qq` is built as section 31 says: `lib/plot/curve.cho` turns the table into the CSV of the curve, and `main.cho` feeds it to the same chart code (lines for ecdf and roc, points for qq). `tests/plot_curve_test.cho` has 15 `cancho test` cases, all hand-worked: the ECDF steps (and a reversed input of 8 values, which runs the shell sort at three gaps), the ROC for 2 and 2, perfect, reversed, tied, unequal classes (1 positive and 2 negatives; 1 and 3, area 2/3 shown as 0.667), the area as the pair count (88 of 100, 0.880) for the gallery table, Q-Q for one value and for three, the known quantiles (0.5, 0.975, 0.9, 0.001, 0.999, 0.02, 0.98, to 1e-5), every refusal code with its line, and the row limit on both sides (4,999 accepted, 5,000 refused).
+
+**A bug the limit test found.** The first version held the values and labels in a region, which is 64 KiB in all; at 4,999 rows the two arrays are 80 KB and the program trapped with exit 132 (no rule tag, which the rules forbid). The arrays are on the heap now (`box_slice`), and the test with 4,999 rows is what keeps it so. The CLI was checked by hand at 4,999 rows (all three curves, exit 0) and at 5,000 (refused with `plot.too-many-points`, exit 2).
+
+**Mutants.** 43 single-line mutants of `curve.cho`: 38 killed, 5 survive. The first run killed 32 of 43; the six real gaps (the boundary at 4,999, the rates divided by the class sizes when the classes differ, the rounding of the area, nine decimals, and a value past 1e15) each have a test now. The five that live give the same output by construction:
+
+- `gap = n / 2` to `gap - 1` in the shell sort: any decreasing gap sequence that ends at 1 sorts.
+- `v[j - gap] > tv` to `>=`: equal values may swap, and equal values give the same rows (ECDF and Q-Q write equal values the same; the ROC crosses tied scores together).
+- `let low = 0.02425`, `p < low`, `p > 1.0 - low`: where Acklam's two formulas meet; both are accurate to 1.2e-9 on either side, so moving or sharpening the cut changes the quantile by less than the tests can read (1e-5) and far less than a chart shows. These three are not proved equivalent; they are below the resolution of the check.
+
+**Not measured:** the ROC area against `ml`'s `roc_auc` (the `ml` binary is not built in this checkout; the pair count is the definition, worked by hand).
+
+**Gallery.** `roc`, `ecdf` and `qq` draw `site/data/scores.csv` (20 hand-written example rows, said to be so on the page, not the output of a model).

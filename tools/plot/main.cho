@@ -4,12 +4,13 @@ edition 9;
 //
 //     plot ticks LO HI [N]     the nice ticks of the range [LO, HI] aimed at N intervals (default 5), one label a line
 //     plot --x COL --y COL[,COL..] [--with points|lines] [--term dumb|svg] [--size WxH] [--title TEXT]
-//                          [--vline X,..] [--hline Y,..] [--band LO,HI].. [--diag] [--yerr COL,.. | --ylo COL,.. --yhi COL,..] [--xhi COL] [--json PATH] < table.csv     a chart (docs/design.md sections 11, 13 and 15)
+//                          [--vline X,..] [--hline Y,..] [--band LO,HI].. [--diag] [--yerr COL,.. | --ylo COL,.. --yhi COL,..] [--xhi COL] [--curve ecdf|roc|qq] [--json PATH] < table.csv     a chart (docs/design.md sections 11, 13 and 15)
 //
 // A refusal prints nothing on standard output and, on standard error, one JSON line `{"error":"plot.<rule>","message":"...","repair":"..."}`; exit status 2.
 // Authority: arguments, standard input, standard output and standard error; no file, no network, no clock.
 
 import plot.chart;
+import plot.curve;
 import plot.jsontable;
 import plot.num;
 import plot.ticks;
@@ -185,6 +186,7 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
     var sh = 0 - 1;
     var svg_term = false;
     var lines = false;
+    var curve_kind = 0;
     var k = 1;
     var seen_x = false;
     var seen_y = false;
@@ -222,6 +224,16 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
                 yhi = value;
             } else if bytes.equal(flag, "--xhi") || bytes.equal(flag, "--z") {
                 xhi = value;
+            } else if bytes.equal(flag, "--curve") {
+                if bytes.equal(value, "ecdf") {
+                    curve_kind = 1;
+                } else if bytes.equal(value, "roc") {
+                    curve_kind = 2;
+                } else if bytes.equal(value, "qq") {
+                    curve_kind = 3;
+                } else {
+                    return refuse(io, "plot.usage", "--curve takes ecdf, roc or qq", "--curve roc --x label --y score");
+                }
             } else if bytes.equal(flag, "--json") {
                 json_path = value;
                 use_json = true;
@@ -301,12 +313,12 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
                     return refuse(io, "plot.size-invalid", "the size is WxH", "--size 60x20");
                 }
             } else {
-                return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --with --term --size --title --vline --hline --band --diag --categories --yerr --ylo --yhi --xhi --z --json");
+                return refuse(io, "plot.usage", "unknown flag", "the flags: --x --y --with --term --size --title --vline --hline --band --diag --categories --yerr --ylo --yhi --xhi --z --curve --json");
             }
             k = k + 2;
         }
     }
-    if !seen_x || !seen_y {
+    if !seen_x || !seen_y && curve_kind != 1 && curve_kind != 3 {
         return refuse(io, "plot.usage", "--x and --y are needed", "plot --x day --y net < table.csv");
     }
     // the size: characters for dumb, pixels for svg
@@ -338,8 +350,10 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
     if use_json && !big {
         // the document as the table the rest reads (section 23)
         var fields = buffer.append(heap, buffer.empty(heap, 64), xspec);
-        fields = buffer.push(heap, fields, byte_of(','));
-        fields = buffer.append(heap, fields, yspec);
+        if len(yspec) > 0 {
+            fields = buffer.push(heap, fields, byte_of(','));
+            fields = buffer.append(heap, fields, yspec);
+        }
         if len(yerr) > 0 {
             fields = buffer.push(heap, fields, byte_of(','));
             fields = buffer.append(heap, fields, yerr);
@@ -366,6 +380,23 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
         buffer.drop(heap, text);
         text = table;
     }
+    var curve_code = 0;
+    var curve_line = 0;
+    if curve_kind > 0 && !big && json_code == 0 {
+        var table = buffer.empty(heap, 1);
+        borrow text as &t1 in {
+            let (c, l, cb) = curve.to_csv(heap, buffer.bytes(t1), curve_kind, xspec, yspec);
+            curve_code = c;
+            curve_line = l;
+            buffer.drop(heap, table);
+            table = cb;
+        }
+        buffer.drop(heap, text);
+        text = table;
+        xspec = "1";
+        yspec = "2";
+        lines = curve_kind != 3;
+    }
     if json_code == 12 {
         status = refuse(io, "plot.json-invalid", "the input is not a JSON document", "pipe a document printed by stats or ml");
     } else if json_code == 13 {
@@ -376,6 +407,22 @@ fn do_chart_with[&h, &i, &g, &a, &c](heap: &!h Heap, io: &!i Io, args: &g Args, 
         status = refuse_line(heap, io, "plot.json-value", "a value is not a number or a plain string (no quote, comma or control byte)", "plot a numeric field, or a text one for a category", json_row);
     } else if json_code == 6 {
         status = refuse(io, "plot.too-many-points", "more than 5000 rows", "plot fewer rows");
+    } else if curve_code == 2 {
+        status = refuse_line(heap, io, "plot.not-numeric", "a cell of a curve column is not a number", "check the table, or choose other columns", curve_line);
+    } else if curve_code == 3 {
+        status = refuse_line(heap, io, "plot.csv-shape", "a line has a different number of cells than the header", "check the table", curve_line);
+    } else if curve_code == 17 {
+        status = refuse_line(heap, io, "plot.roc-label", "a label of the ROC is not 0 or 1", "--x names a column of 0 and 1", curve_line);
+    } else if curve_code == 18 {
+        status = refuse(io, "plot.roc-classes", "the ROC needs both classes: a 0 and a 1 in the label column", "check the label column");
+    } else if curve_code == 1 {
+        status = refuse(io, "plot.csv-quote", "a double quote was found; quoted cells are not read", "write the table without quotes");
+    } else if curve_code == 4 {
+        status = refuse(io, "plot.empty", "the table has no rows", "give it at least one row after the header");
+    } else if curve_code == 5 {
+        status = refuse(io, "plot.column-missing", "a column is not in the header", "name it as the header does, or number it from 1");
+    } else if curve_code == 6 {
+        status = refuse(io, "plot.too-many-points", "more than 4999 rows for a curve", "plot fewer rows");
     } else if big {
         status = refuse(io, "plot.too-many-points", "the input is longer than 16 MiB", "plot fewer rows");
     } else {
