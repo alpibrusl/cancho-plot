@@ -1,6 +1,6 @@
 [package]
 name = "plot"
-cancho = "9934b11fa2962b6d6497e7794a0c99f9aacdb694"   # the compiler every gate here was run with (cancho main, 2026-11-06); move it when a feature needs a later one
+cancho = "0.1.1"   # the compiler release every gate here was run with; move it when a feature needs a later one
 
 [[bin]]
 name = "plot"
